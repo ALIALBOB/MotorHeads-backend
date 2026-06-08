@@ -120,27 +120,15 @@ export const PART_LIBRARY = [
     colors: ["black", "gold"]
   },
   {
-    id: "sticker-quench-can",
-    label: "QUENCH Can Tag",
-    text: "QUENCH",
+    id: "sticker-degen-meter",
+    label: "Degen Meter",
+    text: "DEGEN",
     category: "sticker",
-    shape: "can",
-    art: "quench-can",
-    rarity: "meme",
-    snapSlot: "free",
-    defaultTransform: { x: 46, y: 64, scale: 1, rotation: 6 },
-    colors: ["green", "black"]
-  },
-  {
-    id: "sticker-gm-sun",
-    label: "GM Sun Seal",
-    text: "GM",
-    category: "sticker",
-    shape: "burst",
-    art: "gm-sun",
+    shape: "meter",
+    art: "degen-meter",
     rarity: "meme",
     snapSlot: "free",
     defaultTransform: { x: 52, y: 82, scale: 1, rotation: -2 },
-    colors: ["gold", "black"]
+    colors: ["purple", "cyan"]
   }
 ];
