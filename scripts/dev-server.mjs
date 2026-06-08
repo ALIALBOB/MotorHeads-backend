@@ -4,7 +4,15 @@ import worker from "../src/index.js";
 const port = Number(process.env.PORT || 8787);
 const env = {
   CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
-  ALLOW_UNVERIFIED_WRITES: process.env.ALLOW_UNVERIFIED_WRITES || "false"
+  ALLOW_UNVERIFIED_WRITES: process.env.ALLOW_UNVERIFIED_WRITES || "false",
+  ETH_RPC_URL: process.env.ETH_RPC_URL || "",
+  MOTORHEADS_DEPLOY_BLOCK: process.env.MOTORHEADS_DEPLOY_BLOCK || "0",
+  INDEXER_ADMIN_TOKEN: process.env.INDEXER_ADMIN_TOKEN || "",
+  INDEXER_CONFIRMATIONS: process.env.INDEXER_CONFIRMATIONS || "6",
+  INDEXER_MAX_BLOCK_RANGE: process.env.INDEXER_MAX_BLOCK_RANGE || "1000",
+  GAS_LOW_GWEI: process.env.GAS_LOW_GWEI || "15",
+  GAS_MEDIUM_GWEI: process.env.GAS_MEDIUM_GWEI || "45",
+  GAS_HIGH_GWEI: process.env.GAS_HIGH_GWEI || "90"
 };
 
 const server = http.createServer(async (req, res) => {

@@ -1,5 +1,6 @@
 import { COLLECTION, CIDS, NETWORK } from "./contracts.js";
 import { PART_LIBRARY } from "./parts.js";
+import { readChainSummary, readTokenChainState, syncChainState } from "./chainState.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
 import {
   awakenAgent,
@@ -24,6 +25,14 @@ export default {
       console.error("Unhandled MotorHeads API error", error);
       return errorJson(500, "internal_error", "The MotorHeads backend hit an unexpected error.", undefined, env);
     }
+  },
+
+  async scheduled(event, env = {}, ctx = {}) {
+    ctx.waitUntil(
+      syncChainState(env, { reason: event?.cron || "cron" }).catch((error) => {
+        console.error("MotorHeads chain indexer failed", error);
+      })
+    );
   }
 };
 
@@ -60,9 +69,22 @@ async function route(request, env) {
     return json({ ok: true, parts: PART_LIBRARY }, {}, env);
   }
 
+  if (request.method === "GET" && pathname === "/v1/chain/summary") {
+    return json({ ok: true, chain: await readChainSummary(env) }, {}, env);
+  }
+
+  if (request.method === "POST" && pathname === "/v1/indexer/run") {
+    return handleIndexerRun(request, env);
+  }
+
   const tokenStateMatch = pathname.match(/^\/v1\/tokens\/([^/]+)\/state$/);
   if (tokenStateMatch) {
     return handleTokenState(request, env, tokenStateMatch[1]);
+  }
+
+  const tokenChainStateMatch = pathname.match(/^\/v1\/tokens\/([^/]+)\/chain-state$/);
+  if (tokenChainStateMatch) {
+    return handleTokenChainState(request, env, tokenChainStateMatch[1]);
   }
 
   const agentMatch = pathname.match(/^\/v1\/agent\/([^/]+)$/);
@@ -197,6 +219,38 @@ function handleWalletTokens(request, env, rawWallet) {
   );
 }
 
+async function handleTokenChainState(request, env, rawTokenId) {
+  const tokenId = parseTokenId(rawTokenId);
+  if (!tokenId) {
+    return errorJson(400, "invalid_token_id", "Token ID must be between 1 and 5555.", undefined, env);
+  }
+
+  if (request.method !== "GET") {
+    return errorJson(405, "method_not_allowed", "Use GET for token chain state.", undefined, env);
+  }
+
+  return json({ ok: true, chainState: await readTokenChainState(env, tokenId) }, {}, env);
+}
+
+async function handleIndexerRun(request, env) {
+  if (!env.INDEXER_ADMIN_TOKEN) {
+    return errorJson(
+      501,
+      "indexer_admin_token_missing",
+      "Manual indexer runs are locked until INDEXER_ADMIN_TOKEN is configured.",
+      undefined,
+      env
+    );
+  }
+
+  if (request.headers.get("X-Indexer-Token") !== env.INDEXER_ADMIN_TOKEN) {
+    return errorJson(401, "indexer_admin_required", "Manual indexer runs require X-Indexer-Token.", undefined, env);
+  }
+
+  const result = await syncChainState(env, { reason: "manual-api" });
+  return json({ ok: true, indexer: result }, {}, env);
+}
+
 async function readJsonBody(request, env) {
   try {
     return { data: await request.json() };
@@ -232,4 +286,3 @@ function requireWriteAuth(request, env) {
 
   return { walletAddress, signature, signedMessage };
 }
-

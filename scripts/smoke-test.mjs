@@ -34,6 +34,20 @@ async function call(path, init = {}) {
 }
 
 {
+  const { response, body } = await call("/v1/chain/summary");
+  assert.equal(response.status, 200);
+  assert.equal(body.chain.gasLevel, "idle");
+}
+
+{
+  const { response, body } = await call("/v1/tokens/1/chain-state");
+  assert.equal(response.status, 200);
+  assert.equal(body.chainState.tokenId, 1);
+  assert.equal(body.chainState.saleCount, 0);
+  assert.equal(body.chainState.evolutionTier, "new");
+}
+
+{
   const { response, body } = await call("/v1/tokens/1/state");
   assert.equal(response.status, 200);
   assert.equal(body.state.tokenId, 1);
@@ -50,4 +64,3 @@ async function call(path, init = {}) {
 }
 
 console.log("MotorHeads backend smoke test passed.");
-
