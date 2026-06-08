@@ -5,8 +5,9 @@
   "type": "module",
   "description": "MotorHeads registry and agent API for owner-edited NFT visuals.",
   "scripts": {
-    "check": "node --check src/index.js && node --check src/state.js && node --check src/responses.js && node --check src/contracts.js && node --check src/parts.js && node --check scripts/smoke-test.mjs",
+    "check": "node --check src/index.js && node --check src/state.js && node --check src/responses.js && node --check src/contracts.js && node --check src/parts.js && node --check scripts/smoke-test.mjs && node --check scripts/dev-server.mjs",
     "test": "node scripts/smoke-test.mjs",
+    "dev:node": "node scripts/dev-server.mjs",
     "dev": "npx wrangler dev",
     "deploy": "npx wrangler deploy",
     "db:migrate:local": "npx wrangler d1 execute motorheads_registry --local --file=schema.sql",
@@ -16,4 +17,3 @@
     "node": ">=20"
   }
 }
-

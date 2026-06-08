@@ -19,8 +19,21 @@ Write endpoints are locked by default. Do not enable persistent writes until wal
 ```bash
 npm run check
 npm test
+npm run dev:node
 npm run dev
 npm run deploy
+```
+
+`npm run dev:node` starts a dependency-free local Worker wrapper at:
+
+```text
+http://127.0.0.1:8787
+```
+
+Use that URL in the website Owner Lab backend field, or open the website with:
+
+```text
+http://localhost:5173/?api=http://127.0.0.1:8787
 ```
 
 ## Production Shape
@@ -29,4 +42,3 @@ npm run deploy
 - Backend: stores optional custom state after a holder signs an edit message.
 - D1: stores custom overlays, colors, and agent state.
 - IPFS/Filebase: remains the immutable base art and metadata layer.
-
