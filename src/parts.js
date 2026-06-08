@@ -1,93 +1,112 @@
 export const PART_LIBRARY = [
   {
-    id: "gold-gear-halo",
-    label: "Gold Gear Halo",
-    category: "head-addon",
-    rarity: "core",
-    snapSlot: "head-top",
-    defaultTransform: { x: 0, y: -120, scale: 1, rotation: 0 },
-    colors: ["gold", "cyan"]
+    id: "sticker-rekt",
+    label: "REKT Plate",
+    text: "REKT",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 64, y: 66, scale: 1, rotation: -6 },
+    colors: ["red", "black"]
   },
   {
-    id: "chain-meter-left",
-    label: "Chain Meter",
-    category: "shoulder-device",
-    rarity: "core",
-    snapSlot: "left-shoulder",
-    defaultTransform: { x: -168, y: 56, scale: 1, rotation: -8 },
-    colors: ["black", "green", "gold"]
+    id: "sticker-nft",
+    label: "NFT Stamp",
+    text: "NFT",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 24, y: 67, scale: 1, rotation: 5 },
+    colors: ["cyan", "silver"]
   },
   {
-    id: "sale-gear-badge",
-    label: "Sale Gear Badge",
-    category: "badge",
-    rarity: "sale-reactive",
-    snapSlot: "right-shoulder",
-    defaultTransform: { x: 170, y: 76, scale: 1, rotation: 0 },
+    id: "sticker-web3",
+    label: "WEB3 Tag",
+    text: "WEB3",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 70, y: 78, scale: 1, rotation: 3 },
+    colors: ["green", "black"]
+  },
+  {
+    id: "sticker-gm",
+    label: "GM Bolt",
+    text: "GM",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 34, y: 57, scale: 1, rotation: -4 },
     colors: ["gold", "black"]
   },
   {
-    id: "transfer-scar-plate",
-    label: "Transfer Scar Plate",
-    category: "scar",
-    rarity: "chain-reactive",
-    snapSlot: "right-chest",
-    defaultTransform: { x: 98, y: 150, scale: 1, rotation: -13 },
-    colors: ["rust", "red", "cyan"]
+    id: "sticker-wagmi",
+    label: "WAGMI Strip",
+    text: "WAGMI",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 52, y: 82, scale: 1, rotation: -2 },
+    colors: ["yellow", "black"]
   },
   {
-    id: "block-odometer",
-    label: "Block Odometer",
-    category: "counter",
-    rarity: "core",
-    snapSlot: "lower-chest",
-    defaultTransform: { x: -70, y: 236, scale: 1, rotation: -3 },
-    colors: ["black", "green", "red", "gold"]
+    id: "sticker-lfg",
+    label: "LFG Rivet",
+    text: "LFG",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 82, y: 60, scale: 1, rotation: 8 },
+    colors: ["orange", "black"]
   },
   {
-    id: "gas-heart-reader",
-    label: "Gas Heart Reader",
-    category: "bag-reader",
-    rarity: "gas-reactive",
-    snapSlot: "bag-face",
-    defaultTransform: { x: 216, y: 40, scale: 1, rotation: 0 },
-    colors: ["green", "yellow", "red", "gold"]
+    id: "sticker-ape",
+    label: "APE Plate",
+    text: "APE",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 76, y: 70, scale: 1, rotation: -8 },
+    colors: ["black", "gold"]
   },
   {
-    id: "coolant-tube-pair",
-    label: "Coolant Tube Pair",
-    category: "body-addon",
-    rarity: "core",
-    snapSlot: "torso-side",
-    defaultTransform: { x: 0, y: 122, scale: 1, rotation: 0 },
-    colors: ["cyan", "blue", "silver"]
+    id: "sticker-pudgy",
+    label: "PUDGY Pin",
+    text: "PUDGY",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 19, y: 75, scale: 1, rotation: 7 },
+    colors: ["blue", "white"]
   },
   {
-    id: "small-prism-plaque",
-    label: "Small Prism Plaque",
-    category: "plate",
-    rarity: "rare",
-    snapSlot: "chest-overlay",
-    defaultTransform: { x: 86, y: 110, scale: 1, rotation: 16 },
-    colors: ["glass", "pink", "cyan"]
+    id: "sticker-quench",
+    label: "QUENCH Label",
+    text: "QUENCH",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 46, y: 64, scale: 1, rotation: 6 },
+    colors: ["orange", "black"]
   },
   {
-    id: "wire-scarf-hook",
-    label: "Wire Scarf Hook",
-    category: "neck-addon",
-    rarity: "core",
-    snapSlot: "neck",
-    defaultTransform: { x: -12, y: 24, scale: 1, rotation: 0 },
-    colors: ["gold", "steel"]
+    id: "sticker-wen",
+    label: "WEN Ticket",
+    text: "WEN?",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 42, y: 73, scale: 1, rotation: -9 },
+    colors: ["white", "black"]
   },
   {
-    id: "battery-core-cell",
-    label: "Battery Core Cell",
-    category: "power-addon",
-    rarity: "rare",
-    snapSlot: "core",
-    defaultTransform: { x: 0, y: 190, scale: 1, rotation: 0 },
-    colors: ["green", "cyan", "gold"]
+    id: "sticker-diamond",
+    label: "DIAMOND Tag",
+    text: "DIAMOND",
+    category: "sticker",
+    rarity: "meme",
+    snapSlot: "free",
+    defaultTransform: { x: 58, y: 61, scale: 1, rotation: 5 },
+    colors: ["purple", "cyan"]
   }
 ];
-

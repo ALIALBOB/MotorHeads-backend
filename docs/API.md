@@ -22,7 +22,7 @@ Returns contract address, max supply, mainnet chain info, and current IPFS CIDs.
 
 `GET /v1/parts`
 
-Returns the starter part library used by the future owner editor.
+Returns the starter metal sticker catalog used by the future owner editor.
 
 ## Token Visual State
 
@@ -57,4 +57,3 @@ Future endpoint for owner-signed awaken actions. It uses the same signature head
 `GET /v1/wallet/:address/tokens`
 
 Reserved for a future indexer. The website currently scans the contract through the connected wallet.
-

@@ -6,7 +6,7 @@ This repo is intentionally separate from the NFT generator and the public websit
 
 ## What It Does Now
 
-- Exposes collection config, CIDs, contract address, and part catalog.
+- Exposes collection config, CIDs, contract address, and the metal sticker catalog.
 - Returns default visual state for any token from 1 to 5,555.
 - Provides safe, signature-gated endpoints for future custom visual saves.
 - Provides safe, signature-gated endpoints for future agent awakening.
