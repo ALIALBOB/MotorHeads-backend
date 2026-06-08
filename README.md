@@ -30,7 +30,7 @@ npm run deploy
 http://127.0.0.1:8787
 ```
 
-Use that URL in the website Owner Lab backend field, or open the website with:
+Use that URL in the website Operator Lab backend field, or open the website with:
 
 ```text
 http://localhost:5173/?api=http://127.0.0.1:8787
