@@ -243,12 +243,18 @@ async function handleIndexerRun(request, env) {
     );
   }
 
-  if (request.headers.get("X-Indexer-Token") !== env.INDEXER_ADMIN_TOKEN) {
+  const expectedToken = String(env.INDEXER_ADMIN_TOKEN || "").trim();
+  const providedToken = String(request.headers.get("X-Indexer-Token") || "").trim();
+  if (providedToken !== expectedToken) {
     return errorJson(401, "indexer_admin_required", "Manual indexer runs require X-Indexer-Token.", undefined, env);
   }
 
-  const result = await syncChainState(env, { reason: "manual-api" });
-  return json({ ok: true, indexer: result }, {}, env);
+  try {
+    const result = await syncChainState(env, { reason: "manual-api" });
+    return json({ ok: true, indexer: result }, {}, env);
+  } catch (error) {
+    return errorJson(500, "indexer_failed", error.message || "The chain indexer failed.", undefined, env);
+  }
 }
 
 async function readJsonBody(request, env) {
