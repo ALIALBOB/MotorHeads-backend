@@ -264,12 +264,18 @@ What changed:
   - `performanceMode: "marketplace"` skips the heaviest atmosphere/history/live overlays and body life wobble during normal marketplace playback,
   - marketplace playback uses a cached static base layer so the renderer does not redraw the whole robot body/background every frame,
   - only dynamic layers are redrawn on top: gears/wheels, expression/eyes, gas readers, sale/block/transfer counters, and other chain readouts.
+- Follow-up smoothness patch added after side-by-side testing:
+  - marketplace playback now caches static art as z-ordered runs instead of one flat base, preserving plate/gear stacking closer to the original render,
+  - a cheap whole-machine mouse lean is restored in marketplace mode,
+  - a cheap whole-machine body bounce is restored in marketplace mode without per-part wobble,
+  - drag mode now uses its own cached still frame and redraws only the part in the pointer hand, reducing drag lag,
+  - drag cache is invalidated by selected part ID, chain state, material/background state, and non-selected part positions.
 - The renderer fast path is in:
   - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js`
 
 Local sample status:
 
-- Regenerated token animation samples `1-5` only after the backend and drag tuning patches.
+- Regenerated token animation samples `1-5` only after the backend, drag tuning, static-run cache, body-bounce, and drag-cache patches.
 - DOM test confirmed token `1` can reach the Worker:
   - `data-chain-source="indexer"`
   - `data-chain-block="25281028"` during test
