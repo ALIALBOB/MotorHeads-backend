@@ -216,3 +216,47 @@ Before calling `setBaseURI` again:
 ## Next Best Step
 
 Patch `generate-animations.js` so every generated token animation reads `chain-state` from the Worker, with a timeout and fallback. Then generate 5-10 sample animations, test OpenSea-like iframe behavior locally, and only after that regenerate all 5555.
+
+## 2026-06-09 Local Generator Patch
+
+The local generator workspace has now been patched at:
+
+```text
+D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\scripts\generate-animations.js
+```
+
+Important: this generator workspace is not a Git repo, so the code change is local-only unless the workspace is later moved into a repository.
+
+What changed:
+
+- Generated animations now fetch token state from `https://motorheads-backend.zacbosugame.workers.dev/v1/tokens/:tokenId/chain-state`.
+- Fetch is disabled in capture mode.
+- Fetch has a timeout and deterministic fallback, so an IPFS/OpenSea iframe should never go permanently blank if the backend is slow.
+- Polling is throttled to 45 seconds by default, with a minimum of 15 seconds.
+- Animation defaults to `motion=marketplace`, which lowers CPU cost:
+  - assembled preview is capped around 20 FPS instead of 30 FPS,
+  - idle render is capped around 8 FPS instead of 12 FPS,
+  - cursor glow rings are fewer and shorter.
+- `motion=full` or `motion=studio` restores fuller local/studio motion.
+- Debug-only body dataset markers were added:
+  - `data-chain-source`
+  - `data-chain-block`
+  - `data-backend-online`
+  - `data-backend-error`
+- Optional test query params were added:
+  - `start=assembled`
+  - `start=dismantled`
+  - `resetAssembly=1`
+  - `play=0`
+
+Local sample status:
+
+- Regenerated token animation samples `1-5` only.
+- DOM test confirmed token `1` can reach the Worker:
+  - `data-chain-source="indexer"`
+  - `data-chain-block="25281028"` during test
+  - `data-backend-online="true"`
+- Static CORS check passed with `Access-Control-Allow-Origin: *`.
+- Local assembled screenshot rendered successfully.
+
+Do not regenerate all 5555 or upload a new animation CID until a manual browser pass confirms the token 1 sample feels good enough in normal Chrome, not only headless Chrome.
