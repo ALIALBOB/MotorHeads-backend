@@ -255,6 +255,12 @@ What changed:
   - the dashed line from part to socket was removed,
   - cursor rings are darker smoky teal/black with a small warm metallic glow,
   - `drawMachine(..., { performanceMode: "drag" })` skips the expensive atmosphere/history/live overlays only while a part is being dragged.
+- Smooth-motion patch added after browser testing:
+  - marketplace assembled preview is raised to about 40 FPS,
+  - baseline gear/wheel rotation speed is increased so motion reads as continuous machine movement,
+  - generated animations pass a capped internal `motionTime` to the renderer,
+  - missed browser frames no longer make gears jump forward by the whole wall-clock gap,
+  - `performanceMode: "marketplace"` skips the heaviest atmosphere/history overlays during normal marketplace playback but keeps live chain effects.
 - The renderer fast path is in:
   - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js`
 
