@@ -257,9 +257,9 @@ What changed:
   - `drawMachine(..., { performanceMode: "drag" })` skips the expensive atmosphere/history/live overlays only while a part is being dragged.
 - Smooth-motion patch added after browser testing:
   - the attempted high-FPS marketplace preview was reverted because it made weaker browsers feel heavier,
-  - marketplace assembled preview is now conservative at about 22 FPS,
-  - `motion=eco` or `eco=1` tests an ultra-light about 14 FPS mode,
-  - baseline gear/wheel rotation speed is reduced again so lower frame playback does not look like hard ticking,
+  - marketplace assembled preview is now balanced at about 24 FPS,
+  - `motion=eco` or `eco=1` tests an ultra-light about 12 FPS mode,
+  - baseline gear/wheel rotation speed was restored to visible motion after the too-slow eco pass made gears look frozen,
   - generated animations pass a capped internal `motionTime` to the renderer,
   - missed browser frames no longer make gears jump forward by the whole wall-clock gap,
   - `performanceMode: "marketplace"` skips the heaviest atmosphere/history/live overlays and body life wobble during normal marketplace playback.
