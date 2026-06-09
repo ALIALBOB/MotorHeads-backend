@@ -1,8 +1,16 @@
 node_modules/
 .wrangler/
 .dev.vars
+.env
+.env.*
+!.env.example
 *.log
 dist/
 coverage/
 tmp/
-
+build/
+exports/
+captures/
+*.car
+*.cid
+secrets*.json
