@@ -248,15 +248,27 @@ What changed:
   - `start=dismantled`
   - `resetAssembly=1`
   - `play=0`
+- Drag tuning patch added after browser testing:
+  - dragged parts now follow the pointer directly instead of easing behind it,
+  - selected-part render cap is raised to about 34 FPS in marketplace mode,
+  - snap radius is widened to about `104-150px`, based on part size,
+  - the dashed line from part to socket was removed,
+  - cursor rings are darker smoky teal/black with a small warm metallic glow,
+  - `drawMachine(..., { performanceMode: "drag" })` skips the expensive atmosphere/history/live overlays only while a part is being dragged.
+- The renderer fast path is in:
+  - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js`
 
 Local sample status:
 
-- Regenerated token animation samples `1-5` only.
+- Regenerated token animation samples `1-5` only after the backend and drag tuning patches.
 - DOM test confirmed token `1` can reach the Worker:
   - `data-chain-source="indexer"`
   - `data-chain-block="25281028"` during test
   - `data-backend-online="true"`
 - Static CORS check passed with `Access-Control-Allow-Origin: *`.
 - Local assembled screenshot rendered successfully.
+- Local static animation server used for browser testing:
+  - `http://127.0.0.1:8799/living-archive/animations/1.html?resetAssembly=1`
+  - the server command serves `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\public`.
 
 Do not regenerate all 5555 or upload a new animation CID until a manual browser pass confirms the token 1 sample feels good enough in normal Chrome, not only headless Chrome.
