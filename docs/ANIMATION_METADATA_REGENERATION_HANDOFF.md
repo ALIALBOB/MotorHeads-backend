@@ -256,11 +256,13 @@ What changed:
   - cursor rings are darker smoky teal/black with a small warm metallic glow,
   - `drawMachine(..., { performanceMode: "drag" })` skips the expensive atmosphere/history/live overlays only while a part is being dragged.
 - Smooth-motion patch added after browser testing:
-  - marketplace assembled preview is raised to about 40 FPS,
-  - baseline gear/wheel rotation speed is increased so motion reads as continuous machine movement,
+  - the attempted high-FPS marketplace preview was reverted because it made weaker browsers feel heavier,
+  - marketplace assembled preview is now conservative at about 22 FPS,
+  - `motion=eco` or `eco=1` tests an ultra-light about 14 FPS mode,
+  - baseline gear/wheel rotation speed is reduced again so lower frame playback does not look like hard ticking,
   - generated animations pass a capped internal `motionTime` to the renderer,
   - missed browser frames no longer make gears jump forward by the whole wall-clock gap,
-  - `performanceMode: "marketplace"` skips the heaviest atmosphere/history overlays during normal marketplace playback but keeps live chain effects.
+  - `performanceMode: "marketplace"` skips the heaviest atmosphere/history/live overlays and body life wobble during normal marketplace playback.
 - The renderer fast path is in:
   - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js`
 
