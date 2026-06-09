@@ -260,9 +260,10 @@ What changed:
   - marketplace assembled preview is now balanced at about 24 FPS,
   - `motion=eco` or `eco=1` tests an ultra-light about 12 FPS mode,
   - baseline gear/wheel rotation speed was restored to visible motion after the too-slow eco pass made gears look frozen,
-  - generated animations pass a capped internal `motionTime` to the renderer,
-  - missed browser frames no longer make gears jump forward by the whole wall-clock gap,
-  - `performanceMode: "marketplace"` skips the heaviest atmosphere/history/live overlays and body life wobble during normal marketplace playback.
+  - generated animations now pass real-time `motionTime` again; do not slow or cap the clock as a lag fix,
+  - `performanceMode: "marketplace"` skips the heaviest atmosphere/history/live overlays and body life wobble during normal marketplace playback,
+  - marketplace playback uses a cached static base layer so the renderer does not redraw the whole robot body/background every frame,
+  - only dynamic layers are redrawn on top: gears/wheels, expression/eyes, gas readers, sale/block/transfer counters, and other chain readouts.
 - The renderer fast path is in:
   - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js`
 
