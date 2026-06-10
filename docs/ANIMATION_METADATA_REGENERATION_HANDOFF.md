@@ -19,6 +19,20 @@ This note is the production checkpoint before regenerating MotorHeads animation 
 - Treasury mint block: `25265980`
 - Treasury mint tx: `0x688a118d5faed0cbd9969bed57487dc9f59da230259f32c7d88d74a07a23edf3`
 
+## Prepared Smooth Animation CIDs
+
+Prepared on 2026-06-10. These are uploaded and gateway-verified, but not on-chain until `setBaseURI` is called.
+
+- Images CID reused: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
+- New smooth animations CID: `bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4`
+- New metadata CID: `bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa`
+- Candidate base URI: `ipfs://bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa/`
+- Gateway check passed for:
+  - `https://ipfs.filebase.io/ipfs/bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4/1.html`
+  - `https://ipfs.filebase.io/ipfs/bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa/1`
+- OpenSea readiness passed with `0` warnings across `5555` metadata files and `5555` media slots.
+- Do not mark these as the current live CIDs until the mainnet contract base URI has actually been updated.
+
 ## Live Backend
 
 - Worker URL: `https://motorheads-backend.zacbosugame.workers.dev`
