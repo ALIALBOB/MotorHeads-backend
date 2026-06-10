@@ -8,8 +8,8 @@ export const PART_LIBRARY = [
     art: "wen-token",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 42, y: 68, scale: 1, rotation: -5 },
-    colors: ["red", "black"]
+    defaultTransform: { x: 42, y: 68, scale: 0.78, rotation: -5 },
+    colors: ["red", "gold", "black"]
   },
   {
     id: "sticker-web3-bubble",
@@ -20,8 +20,8 @@ export const PART_LIBRARY = [
     art: "web3-bubble",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 28, y: 64, scale: 1, rotation: 4 },
-    colors: ["white", "black"]
+    defaultTransform: { x: 28, y: 64, scale: 0.78, rotation: 4 },
+    colors: ["white", "cyan", "black"]
   },
   {
     id: "sticker-diamond-hands",
@@ -32,8 +32,8 @@ export const PART_LIBRARY = [
     art: "diamond-hands",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 63, y: 72, scale: 1, rotation: 5 },
-    colors: ["silver", "cyan"]
+    defaultTransform: { x: 63, y: 72, scale: 0.76, rotation: 5 },
+    colors: ["silver", "cyan", "purple"]
   },
   {
     id: "sticker-hodl-coin",
@@ -44,8 +44,8 @@ export const PART_LIBRARY = [
     art: "hodl",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 34, y: 76, scale: 1, rotation: -3 },
-    colors: ["white", "gold"]
+    defaultTransform: { x: 34, y: 76, scale: 0.76, rotation: -3 },
+    colors: ["gold", "white", "black"]
   },
   {
     id: "sticker-tape-banana",
@@ -56,8 +56,8 @@ export const PART_LIBRARY = [
     art: "tape-banana",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 70, y: 60, scale: 1, rotation: -10 },
-    colors: ["yellow", "black"]
+    defaultTransform: { x: 70, y: 60, scale: 0.74, rotation: -10 },
+    colors: ["yellow", "gold", "silver"]
   },
   {
     id: "sticker-when-lambo",
@@ -68,8 +68,8 @@ export const PART_LIBRARY = [
     art: "when-lambo",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 72, y: 69, scale: 1, rotation: 3 },
-    colors: ["gold", "black"]
+    defaultTransform: { x: 72, y: 69, scale: 0.8, rotation: 3 },
+    colors: ["gold", "black", "red"]
   },
   {
     id: "sticker-moon-soon",
@@ -80,8 +80,8 @@ export const PART_LIBRARY = [
     art: "moon-soon",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 31, y: 76, scale: 1, rotation: -7 },
-    colors: ["meta", "cyan"]
+    defaultTransform: { x: 31, y: 76, scale: 0.78, rotation: -7 },
+    colors: ["meta", "cyan", "blue"]
   },
   {
     id: "sticker-rekt-bolt",
@@ -92,8 +92,8 @@ export const PART_LIBRARY = [
     art: "rekt-bolt",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 64, y: 66, scale: 1, rotation: -6 },
-    colors: ["orange", "black"]
+    defaultTransform: { x: 64, y: 66, scale: 0.78, rotation: -6 },
+    colors: ["orange", "red", "black"]
   },
   {
     id: "sticker-nft-chip",
@@ -104,8 +104,8 @@ export const PART_LIBRARY = [
     art: "nft-chip",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 24, y: 67, scale: 1, rotation: 5 },
-    colors: ["cyan", "silver"]
+    defaultTransform: { x: 24, y: 67, scale: 0.74, rotation: 5 },
+    colors: ["cyan", "green", "silver"]
   },
   {
     id: "sticker-ape-rivet",
@@ -116,8 +116,8 @@ export const PART_LIBRARY = [
     art: "ape-rivet",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 76, y: 70, scale: 1, rotation: -8 },
-    colors: ["black", "gold"]
+    defaultTransform: { x: 76, y: 70, scale: 0.7, rotation: -8 },
+    colors: ["black", "gold", "purple"]
   },
   {
     id: "sticker-degen-meter",
@@ -128,7 +128,91 @@ export const PART_LIBRARY = [
     art: "degen-meter",
     rarity: "meme",
     snapSlot: "free",
-    defaultTransform: { x: 52, y: 82, scale: 1, rotation: -2 },
-    colors: ["purple", "cyan"]
+    defaultTransform: { x: 52, y: 82, scale: 0.78, rotation: -2 },
+    colors: ["purple", "cyan", "red"]
+  },
+  {
+    id: "addon-saturn-pin",
+    label: "Saturn Halo Pin",
+    text: "",
+    category: "sticker",
+    shape: "saturn",
+    art: "saturn-pin",
+    rarity: "headwear",
+    snapSlot: "head-top",
+    defaultTransform: { x: 50, y: 20, scale: 0.72, rotation: -5 },
+    colors: ["pink", "gold", "cyan"]
+  },
+  {
+    id: "addon-penguin-cap",
+    label: "Metal Penguin Cap",
+    text: "",
+    category: "sticker",
+    shape: "hood",
+    art: "penguin-cap",
+    rarity: "headwear",
+    snapSlot: "head-top",
+    defaultTransform: { x: 50, y: 26, scale: 0.76, rotation: 1 },
+    colors: ["blue", "black", "silver"]
+  },
+  {
+    id: "addon-paper-bag-mask",
+    label: "Paper Bag Mask",
+    text: "",
+    category: "sticker",
+    shape: "mask",
+    art: "paper-bag-mask",
+    rarity: "headwear",
+    snapSlot: "head-top",
+    defaultTransform: { x: 49, y: 31, scale: 0.8, rotation: -2 },
+    colors: ["tan", "gold", "black"]
+  },
+  {
+    id: "addon-horn-crown",
+    label: "Horn Crown Visor",
+    text: "",
+    category: "sticker",
+    shape: "crown",
+    art: "horn-crown",
+    rarity: "headwear",
+    snapSlot: "head-top",
+    defaultTransform: { x: 50, y: 20, scale: 0.76, rotation: 2 },
+    colors: ["gold", "silver", "red"]
+  },
+  {
+    id: "addon-teddy-gear",
+    label: "Teddy Gear Charm",
+    text: "",
+    category: "sticker",
+    shape: "charm",
+    art: "teddy-gear",
+    rarity: "bag-charm",
+    snapSlot: "right-shoulder",
+    defaultTransform: { x: 67, y: 62, scale: 0.68, rotation: -7 },
+    colors: ["brown", "cyan", "gold"]
+  },
+  {
+    id: "addon-rocket-visor",
+    label: "Rocket Visor",
+    text: "",
+    category: "sticker",
+    shape: "visor",
+    art: "rocket-visor",
+    rarity: "headwear",
+    snapSlot: "head-top",
+    defaultTransform: { x: 54, y: 28, scale: 0.76, rotation: 4 },
+    colors: ["red", "orange", "blue"]
+  },
+  {
+    id: "addon-gas-satchel",
+    label: "Gas Satchel Label",
+    text: "GAS",
+    category: "sticker",
+    shape: "satchel",
+    art: "gas-satchel",
+    rarity: "bag-tag",
+    snapSlot: "bag-face",
+    defaultTransform: { x: 80, y: 55, scale: 0.7, rotation: -3 },
+    colors: ["green", "cyan", "black"]
   }
 ];

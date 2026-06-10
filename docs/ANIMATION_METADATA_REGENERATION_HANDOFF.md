@@ -1,6 +1,6 @@
 # MotorHeads Animation and Metadata Handoff
 
-Last updated: 2026-06-09
+Last updated: 2026-06-10
 
 This note is the production checkpoint before regenerating MotorHeads animation files and metadata. Use it when a new chat/session needs to resume the work.
 
@@ -11,9 +11,9 @@ This note is the production checkpoint before regenerating MotorHeads animation 
 - Chain: Ethereum mainnet
 - Contract: `0x0a5008550fc1402bb567a3ba38d9433e6199ceb1`
 - Treasury/main wallet: `0x95A6fB3087b3469Ed777120052E0ac3f262c81C1`
-- Current base URI on contract: `ipfs://bafybeidoduu5fudul2j46p2iefeaiwg7plkucwgsesih7gjsltbp44acma/`
+- Current base URI on contract: `ipfs://bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/`
 - Current images CID: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
-- Current animations CID: `bafybeibncy2oyrsodh4ctsh2lr4l5zvalzakt5isndtjsgtwdhlmazbakq`
+- Current animations CID: `bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq`
 - Current contract metadata CID: `bafybeicgckcmtjt63iwxgbkr3jouzcabpxncs5qcp4vunlfiirlgeb344a`
 - Existing treasury mint: tokens `1` through `10`
 - Treasury mint block: `25265980`
@@ -21,7 +21,7 @@ This note is the production checkpoint before regenerating MotorHeads animation 
 
 ## Prepared Smooth Animation CIDs
 
-Prepared on 2026-06-10. These are uploaded and gateway-verified, but not on-chain until `setBaseURI` is called.
+Prepared on 2026-06-10. These are uploaded, gateway-verified, and the v3 metadata base URI has been set on the mainnet contract by the owner.
 
 - Images CID reused: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
 - Superseded smooth animations CID with assembly/cache bug: `bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4`
@@ -36,8 +36,18 @@ Prepared on 2026-06-10. These are uploaded and gateway-verified, but not on-chai
   - `https://ipfs.filebase.io/ipfs/bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq/10.html`
   - `https://ipfs.filebase.io/ipfs/bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/2`
 - OpenSea readiness passed with `0` warnings across `5555` metadata files and `5555` media slots.
-- Do not mark these as the current live CIDs until the mainnet contract base URI has actually been updated.
+- These are now the current live CIDs after the owner updated the mainnet contract base URI.
 - The v3 animation storage key is `lamOpenSeaAssembly:v3-cache-fix:...`; this intentionally ignores old token-specific `v2` localStorage that could keep broken assembled positions after a metadata refresh.
+
+## Website Editor Direction
+
+- Website repo: `D:\MotorHeads-5555`
+- Backend parts catalog: `D:\MotorHeads-backend\src\parts.js`
+- Keep Operator wallet writes disabled until the ownership signature verifier and registry writes are production ready.
+- The public site can show local browser sticker/add-on previews.
+- Current editor rack direction: compact metal selector cards, colorable stickers/add-ons, original MotorHeads-compatible headwear and bag charms.
+- Do not copy Pudgy/other brand art. Use original metallic web3-style accessories that only borrow broad ideas like small hood/cap/charm silhouettes.
+- Current website preview should use animation CID `bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq`.
 
 ## Live Backend
 

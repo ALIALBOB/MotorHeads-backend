@@ -19,9 +19,8 @@ export const COLLECTION = {
 };
 
 export const CIDS = {
-  baseUri: "ipfs://bafybeidoduu5fudul2j46p2iefeaiwg7plkucwgsesih7gjsltbp44acma/",
+  baseUri: "ipfs://bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/",
   images: "bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq",
-  animations: "bafybeibncy2oyrsodh4ctsh2lr4l5zvalzakt5isndtjsgtwdhlmazbakq",
+  animations: "bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq",
   contractMetadata: "bafybeicgckcmtjt63iwxgbkr3jouzcabpxncs5qcp4vunlfiirlgeb344a"
 };
-
