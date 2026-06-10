@@ -245,13 +245,13 @@ Before calling `setBaseURI` again:
 
 ## Next Best Step
 
-Manually test the latest local samples in Chrome, especially token `3` on OpenSea-like fullscreen/double-click behavior:
+The latest 2026-06-10 OpenSea interaction build has been generated, uploaded, and gateway-checked. The owner can now set the mainnet contract base URI to:
 
 ```text
-http://127.0.0.1:8799/living-archive/animations/3.html?resetAssembly=1&start=assembled&backend=0
+ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/
 ```
 
-If the samples pass, regenerate all 5555 animations, upload a new animation CID, regenerate metadata with that animation CID, upload a new metadata CID, and only then update the mainnet contract base URI.
+After that, refresh token `1` and token `5555` on OpenSea and verify the animation buttons, blink, drag cursor behavior, and fullscreen/double-click behavior.
 
 ## 2026-06-09 Local Generator Patch
 
@@ -344,4 +344,19 @@ What changed:
 - Headless screenshot check passed at:
   - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\build\animation-button-check.png`
 
-This patch is not live on OpenSea yet. OpenSea will only show it after creating a new animation CID, regenerating metadata with the new `animation_url` values, uploading the new metadata CID, and setting the mainnet contract base URI to that new metadata CID.
+Generated and uploaded production candidate:
+
+- Images CID reused: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
+- New animations CID: `bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq`
+- New metadata CID: `bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy`
+- New base URI candidate: `ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/`
+- Animation CAR SHA-256: `0794DA4715DFD9FA6D77F6DF43268DF574DD2818B4E871F426EF9019065E5C3B`
+- Metadata CAR SHA-256: `EAF278B986E81A4409F2C861E506965619CD553A31158B93277FCAF4903D201B`
+- `npm run lam:validate-opensea` passed with `0` warnings across `5555` metadata files and `5555` media slots.
+- Gateway checks passed:
+  - `https://ipfs.filebase.io/ipfs/bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/1`
+  - `https://ipfs.filebase.io/ipfs/bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/5555`
+  - `https://ipfs.filebase.io/ipfs/bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq/1.html`
+  - `https://ipfs.filebase.io/ipfs/bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq/5555.html`
+
+This patch is not live on OpenSea until the owner calls `setBaseURI("ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/")` on the mainnet contract.
