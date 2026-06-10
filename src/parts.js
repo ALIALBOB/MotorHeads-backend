@@ -140,20 +140,32 @@ export const PART_LIBRARY = [
     art: "saturn-pin",
     rarity: "headwear",
     snapSlot: "head-top",
-    defaultTransform: { x: 50, y: 20, scale: 0.72, rotation: -5 },
+    defaultTransform: { x: 50, y: 25, scale: 0.92, rotation: -5 },
     colors: ["pink", "gold", "cyan"]
   },
   {
     id: "addon-penguin-cap",
-    label: "Metal Penguin Cap",
+    label: "Metal Hood Cap",
     text: "",
     category: "sticker",
     shape: "hood",
     art: "penguin-cap",
     rarity: "headwear",
     snapSlot: "head-top",
-    defaultTransform: { x: 50, y: 26, scale: 0.76, rotation: 1 },
+    defaultTransform: { x: 50, y: 31, scale: 1.04, rotation: 1 },
     colors: ["blue", "black", "silver"]
+  },
+  {
+    id: "addon-bear-hood",
+    label: "Bear Gear Hood",
+    text: "",
+    category: "sticker",
+    shape: "hood",
+    art: "bear-hood",
+    rarity: "head-cover",
+    snapSlot: "head-top",
+    defaultTransform: { x: 50, y: 32, scale: 1.05, rotation: -1 },
+    colors: ["brown", "gold", "black"]
   },
   {
     id: "addon-paper-bag-mask",
@@ -162,21 +174,21 @@ export const PART_LIBRARY = [
     category: "sticker",
     shape: "mask",
     art: "paper-bag-mask",
-    rarity: "headwear",
+    rarity: "head-cover",
     snapSlot: "head-top",
-    defaultTransform: { x: 49, y: 31, scale: 0.8, rotation: -2 },
+    defaultTransform: { x: 50, y: 34, scale: 1.1, rotation: -2 },
     colors: ["tan", "gold", "black"]
   },
   {
     id: "addon-horn-crown",
-    label: "Horn Crown Visor",
+    label: "Golden Horn Visor",
     text: "",
     category: "sticker",
     shape: "crown",
     art: "horn-crown",
     rarity: "headwear",
     snapSlot: "head-top",
-    defaultTransform: { x: 50, y: 20, scale: 0.76, rotation: 2 },
+    defaultTransform: { x: 50, y: 25, scale: 1, rotation: 2 },
     colors: ["gold", "silver", "red"]
   },
   {
@@ -188,7 +200,7 @@ export const PART_LIBRARY = [
     art: "teddy-gear",
     rarity: "bag-charm",
     snapSlot: "right-shoulder",
-    defaultTransform: { x: 67, y: 62, scale: 0.68, rotation: -7 },
+    defaultTransform: { x: 67, y: 60, scale: 0.86, rotation: -7 },
     colors: ["brown", "cyan", "gold"]
   },
   {
@@ -200,7 +212,7 @@ export const PART_LIBRARY = [
     art: "rocket-visor",
     rarity: "headwear",
     snapSlot: "head-top",
-    defaultTransform: { x: 54, y: 28, scale: 0.76, rotation: 4 },
+    defaultTransform: { x: 53, y: 32, scale: 0.96, rotation: 4 },
     colors: ["red", "orange", "blue"]
   },
   {
@@ -212,7 +224,7 @@ export const PART_LIBRARY = [
     art: "gas-satchel",
     rarity: "bag-tag",
     snapSlot: "bag-face",
-    defaultTransform: { x: 80, y: 55, scale: 0.7, rotation: -3 },
+    defaultTransform: { x: 80, y: 58, scale: 0.82, rotation: -3 },
     colors: ["green", "cyan", "black"]
   }
 ];
