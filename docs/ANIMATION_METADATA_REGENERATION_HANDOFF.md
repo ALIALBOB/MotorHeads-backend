@@ -26,14 +26,18 @@ Prepared on 2026-06-10. These are uploaded and gateway-verified, but not on-chai
 - Images CID reused: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
 - Superseded smooth animations CID with assembly/cache bug: `bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4`
 - Superseded metadata CID with assembly/cache bug: `bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa`
-- Corrected smooth animations CID: `bafybeiehpvube6l3unkneggk3icjv7cykbex7rm5jxe6coabwg2ecr4evy`
-- Corrected metadata CID: `bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4`
-- Corrected candidate base URI: `ipfs://bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4/`
+- Superseded corrected smooth animations CID with `v2` browser storage key: `bafybeiehpvube6l3unkneggk3icjv7cykbex7rm5jxe6coabwg2ecr4evy`
+- Superseded corrected metadata CID with `v2` browser storage key: `bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4`
+- Final v3 cache-reset animations CID: `bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq`
+- Final v3 cache-reset metadata CID: `bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m`
+- Final candidate base URI: `ipfs://bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/`
 - Gateway check passed for:
-  - `https://ipfs.filebase.io/ipfs/bafybeiehpvube6l3unkneggk3icjv7cykbex7rm5jxe6coabwg2ecr4evy/1.html`
-  - `https://ipfs.filebase.io/ipfs/bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4/1`
+  - `https://ipfs.filebase.io/ipfs/bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq/2.html`
+  - `https://ipfs.filebase.io/ipfs/bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq/10.html`
+  - `https://ipfs.filebase.io/ipfs/bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/2`
 - OpenSea readiness passed with `0` warnings across `5555` metadata files and `5555` media slots.
 - Do not mark these as the current live CIDs until the mainnet contract base URI has actually been updated.
+- The v3 animation storage key is `lamOpenSeaAssembly:v3-cache-fix:...`; this intentionally ignores old token-specific `v2` localStorage that could keep broken assembled positions after a metadata refresh.
 
 ## Live Backend
 
