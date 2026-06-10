@@ -245,7 +245,13 @@ Before calling `setBaseURI` again:
 
 ## Next Best Step
 
-Patch `generate-animations.js` so every generated token animation reads `chain-state` from the Worker, with a timeout and fallback. Then generate 5-10 sample animations, test OpenSea-like iframe behavior locally, and only after that regenerate all 5555.
+Manually test the latest local samples in Chrome, especially token `3` on OpenSea-like fullscreen/double-click behavior:
+
+```text
+http://127.0.0.1:8799/living-archive/animations/3.html?resetAssembly=1&start=assembled&backend=0
+```
+
+If the samples pass, regenerate all 5555 animations, upload a new animation CID, regenerate metadata with that animation CID, upload a new metadata CID, and only then update the mainnet contract base URI.
 
 ## 2026-06-09 Local Generator Patch
 
@@ -317,3 +323,25 @@ Local sample status:
   - the server command serves `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\public`.
 
 Do not regenerate all 5555 or upload a new animation CID until a manual browser pass confirms the token 1 sample feels good enough in normal Chrome, not only headless Chrome.
+
+## 2026-06-10 OpenSea Interaction Patch
+
+The local generator workspace has an additional marketplace interaction patch in:
+
+```text
+D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\scripts\generate-animations.js
+D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\web\src\renderer.js
+```
+
+What changed:
+
+- Eye blink was restored in marketplace fast path without re-enabling the expensive full body life-motion path.
+- The canvas no longer shows a grab hand over the whole NFT. It only switches to grab when the pointer is over a draggable loose part.
+- Background pointer handling now leaves normal marketplace interaction alone, so double-clicking empty/background space can request fullscreen.
+- A fallback opens the same animation URL in a new window if `requestFullscreen()` is blocked by the marketplace iframe/browser.
+- The D/A/S controls were reduced to compact 20px metal buttons with shaded teal/gold states.
+- Generated samples `1-5` were refreshed locally.
+- Headless screenshot check passed at:
+  - `D:\MotorHeads-mechanical-canvas\mechanical-canvas-nft\build\animation-button-check.png`
+
+This patch is not live on OpenSea yet. OpenSea will only show it after creating a new animation CID, regenerating metadata with the new `animation_url` values, uploading the new metadata CID, and setting the mainnet contract base URI to that new metadata CID.
