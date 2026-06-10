@@ -24,12 +24,14 @@ This note is the production checkpoint before regenerating MotorHeads animation 
 Prepared on 2026-06-10. These are uploaded and gateway-verified, but not on-chain until `setBaseURI` is called.
 
 - Images CID reused: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq`
-- New smooth animations CID: `bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4`
-- New metadata CID: `bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa`
-- Candidate base URI: `ipfs://bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa/`
+- Superseded smooth animations CID with assembly/cache bug: `bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4`
+- Superseded metadata CID with assembly/cache bug: `bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa`
+- Corrected smooth animations CID: `bafybeiehpvube6l3unkneggk3icjv7cykbex7rm5jxe6coabwg2ecr4evy`
+- Corrected metadata CID: `bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4`
+- Corrected candidate base URI: `ipfs://bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4/`
 - Gateway check passed for:
-  - `https://ipfs.filebase.io/ipfs/bafybeieyhpb5ygv7bbq7yivdwhcg2au254foqakhhjkvgxe37h5qrfrgr4/1.html`
-  - `https://ipfs.filebase.io/ipfs/bafybeigjy3a6akv53iudidtm43ogz6n3y3eqax6nc5q3yftk4j4hrchysa/1`
+  - `https://ipfs.filebase.io/ipfs/bafybeiehpvube6l3unkneggk3icjv7cykbex7rm5jxe6coabwg2ecr4evy/1.html`
+  - `https://ipfs.filebase.io/ipfs/bafybeidtaswxdemksiojw5voqe4hgaamu2t32mc2mnbbpqavfzi2yopjx4/1`
 - OpenSea readiness passed with `0` warnings across `5555` metadata files and `5555` media slots.
 - Do not mark these as the current live CIDs until the mainnet contract base URI has actually been updated.
 
