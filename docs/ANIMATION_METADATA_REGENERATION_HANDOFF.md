@@ -267,7 +267,7 @@ What changed:
 - Follow-up smoothness patch added after side-by-side testing:
   - marketplace playback now caches static art as z-ordered runs instead of one flat base, preserving plate/gear stacking closer to the original render,
   - a cheap whole-machine mouse lean is restored in marketplace mode,
-  - a cheap whole-machine body bounce is restored in marketplace mode without per-part wobble,
+  - a cheap whole-machine body bounce is restored in marketplace mode without per-part wobble, then slightly increased after testing so it reads visibly,
   - drag mode now uses its own cached still frame and redraws only the part in the pointer hand, reducing drag lag,
   - drag cache is invalidated by selected part ID, chain state, material/background state, and non-selected part positions.
 - The renderer fast path is in:
