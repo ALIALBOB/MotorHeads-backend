@@ -139,12 +139,13 @@ export async function syncChainState(env, options = {}) {
   await writeChainMetrics(env, latestBlock, gasWei);
 
   const checkpoint = await env.DB
-    .prepare("SELECT indexed_to_block FROM chain_indexer_checkpoint WHERE checkpoint_key = ?")
+    .prepare("SELECT indexed_to_block, payload_json FROM chain_indexer_checkpoint WHERE checkpoint_key = ?")
     .bind("motorheads-transfer-indexer")
     .first();
 
   const checkpointBlock = checkpoint?.indexed_to_block || deployBlock - 1;
-  const fromBlock = Math.max(deployBlock, checkpointBlock + 1);
+  const resumeCursor = readResumeCursor(checkpoint, checkpointBlock);
+  const fromBlock = resumeCursor ? resumeCursor.blockNumber : Math.max(deployBlock, checkpointBlock + 1);
   if (fromBlock > safeLatestBlock) {
     return {
       ok: true,
@@ -165,9 +166,12 @@ export async function syncChainState(env, options = {}) {
   const transferLogs = logs
     .map(parseTransferLog)
     .filter(Boolean)
+    .filter((log) => !resumeCursor || log.blockNumber !== resumeCursor.blockNumber || log.logIndex > resumeCursor.logIndex)
     .sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
   const maxLogsPerRun = Math.max(1, cleanInteger(env.INDEXER_MAX_LOGS_PER_RUN, DEFAULT_MAX_LOGS_PER_RUN));
-  const plan = buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun);
+  const plan = buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun, {
+    baseCheckpointToBlock: checkpointBlock
+  });
   const txTransferCounts = countTransfersByTransaction(plan.logsToProcess);
   const txValueCache = new Map();
   let transfersProcessed = 0;
@@ -186,6 +190,8 @@ export async function syncChainState(env, options = {}) {
     requestedFromBlock: fromBlock,
     requestedToBlock,
     effectiveToBlock: toBlock,
+    resumeCursor,
+    nextCursor: plan.nextCursor,
     logFetchAttempts: logBatch.attempts,
     rawLogsFetched: logs.length,
     logsSeen: transferLogs.length,
@@ -204,6 +210,8 @@ export async function syncChainState(env, options = {}) {
     latestBlock,
     safeLatestBlock,
     requestedToBlock,
+    resumeCursor,
+    nextCursor: plan.nextCursor,
     logFetchAttempts: logBatch.attempts,
     logsSeen: transferLogs.length,
     logsProcessed: plan.logsToProcess.length,
@@ -242,51 +250,69 @@ async function readTransferLogs(env, fromBlock, requestedToBlock) {
   throw lastError || new Error("Unable to fetch transfer logs.");
 }
 
-export function buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun) {
+export function buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun, options = {}) {
   const sortedLogs = [...transferLogs].sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
   if (!sortedLogs.length) {
     return {
       logsToProcess: [],
       checkpointToBlock: toBlock,
       logsDeferred: 0,
-      partial: false
+      partial: false,
+      nextCursor: null
     };
   }
 
   const budget = Math.max(1, Math.floor(Number(maxLogsPerRun) || DEFAULT_MAX_LOGS_PER_RUN));
-  const logsToProcess = [];
-  let cursor = 0;
-  let checkpointToBlock = fromBlock - 1;
+  const logsToProcess = sortedLogs.slice(0, budget);
+  const remainingLogs = sortedLogs.slice(logsToProcess.length);
+  const partial = remainingLogs.length > 0;
+  const baseCheckpointToBlock = cleanInteger(options.baseCheckpointToBlock, fromBlock - 1);
+  let checkpointToBlock = toBlock;
+  let nextCursor = null;
 
-  while (cursor < sortedLogs.length) {
-    const blockNumber = sortedLogs[cursor].blockNumber;
-    const blockLogs = [];
-    while (cursor < sortedLogs.length && sortedLogs[cursor].blockNumber === blockNumber) {
-      blockLogs.push(sortedLogs[cursor]);
-      cursor += 1;
-    }
-
-    const wouldExceedBudget = logsToProcess.length > 0 && logsToProcess.length + blockLogs.length > budget;
-    if (wouldExceedBudget) {
-      cursor -= blockLogs.length;
-      break;
-    }
-
-    logsToProcess.push(...blockLogs);
-    checkpointToBlock = blockNumber;
-
-    if (logsToProcess.length >= budget) {
-      break;
+  if (partial) {
+    const lastProcessedLog = logsToProcess[logsToProcess.length - 1];
+    const nextLog = remainingLogs[0];
+    if (lastProcessedLog && nextLog?.blockNumber === lastProcessedLog.blockNumber) {
+      const previousCompleteLog = [...logsToProcess].reverse().find((log) => log.blockNumber < lastProcessedLog.blockNumber);
+      checkpointToBlock = previousCompleteLog?.blockNumber || baseCheckpointToBlock;
+      nextCursor = {
+        blockNumber: lastProcessedLog.blockNumber,
+        logIndex: lastProcessedLog.logIndex
+      };
+    } else {
+      checkpointToBlock = lastProcessedLog?.blockNumber || baseCheckpointToBlock;
     }
   }
 
-  const partial = cursor < sortedLogs.length;
   return {
     logsToProcess,
-    checkpointToBlock: partial ? checkpointToBlock : toBlock,
+    checkpointToBlock,
     logsDeferred: sortedLogs.length - logsToProcess.length,
-    partial
+    partial,
+    nextCursor
   };
+}
+
+function readResumeCursor(checkpoint, checkpointBlock) {
+  const payload = parseJsonObject(checkpoint?.payload_json);
+  const cursor = payload?.nextCursor;
+  if (!cursor) return null;
+
+  const blockNumber = cleanInteger(cursor.blockNumber, 0);
+  const logIndex = cleanInteger(cursor.logIndex, -1);
+  if (blockNumber <= checkpointBlock || logIndex < 0) return null;
+  return { blockNumber, logIndex };
+}
+
+function parseJsonObject(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 async function applyTransferLog(env, log, txTransferCounts, txValueCache) {

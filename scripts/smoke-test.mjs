@@ -58,9 +58,10 @@ async function call(path, init = {}) {
     { blockNumber: 12, logIndex: 0 }
   ];
   const plan = buildTransferProcessingPlan(logs, 10, 20, 4);
-  assert.equal(plan.logsToProcess.length, 2);
+  assert.equal(plan.logsToProcess.length, 4);
   assert.equal(plan.checkpointToBlock, 10);
-  assert.equal(plan.logsDeferred, 4);
+  assert.deepEqual(plan.nextCursor, { blockNumber: 11, logIndex: 1 });
+  assert.equal(plan.logsDeferred, 2);
   assert.equal(plan.partial, true);
 }
 
@@ -73,9 +74,10 @@ async function call(path, init = {}) {
     { blockNumber: 31, logIndex: 0 }
   ];
   const plan = buildTransferProcessingPlan(logs, 30, 31, 2);
-  assert.equal(plan.logsToProcess.length, 4);
-  assert.equal(plan.checkpointToBlock, 30);
-  assert.equal(plan.logsDeferred, 1);
+  assert.equal(plan.logsToProcess.length, 2);
+  assert.equal(plan.checkpointToBlock, 29);
+  assert.deepEqual(plan.nextCursor, { blockNumber: 30, logIndex: 1 });
+  assert.equal(plan.logsDeferred, 3);
   assert.equal(plan.partial, true);
 }
 
@@ -83,7 +85,23 @@ async function call(path, init = {}) {
   const plan = buildTransferProcessingPlan([], 40, 55, 1000);
   assert.equal(plan.logsToProcess.length, 0);
   assert.equal(plan.checkpointToBlock, 55);
+  assert.equal(plan.nextCursor, null);
   assert.equal(plan.partial, false);
+}
+
+{
+  const logs = [
+    { blockNumber: 47, logIndex: 0 },
+    { blockNumber: 47, logIndex: 1 },
+    { blockNumber: 47, logIndex: 2 },
+    { blockNumber: 47, logIndex: 3 }
+  ];
+  const plan = buildTransferProcessingPlan(logs, 47, 60, 2, { baseCheckpointToBlock: 44 });
+  assert.equal(plan.logsToProcess.length, 2);
+  assert.equal(plan.checkpointToBlock, 44);
+  assert.deepEqual(plan.nextCursor, { blockNumber: 47, logIndex: 1 });
+  assert.equal(plan.logsDeferred, 2);
+  assert.equal(plan.partial, true);
 }
 
 {
