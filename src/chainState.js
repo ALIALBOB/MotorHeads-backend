@@ -4,6 +4,9 @@ const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const SECONDS_PER_BLOCK = 12;
 const SECONDS_PER_DAY = 86400;
+const DEFAULT_MAX_BLOCK_RANGE = 100;
+const HARD_MAX_BLOCK_RANGE = 5000;
+const DEFAULT_MAX_LOGS_PER_RUN = 1000;
 
 export function buildDefaultChainState(tokenId) {
   return {
@@ -17,6 +20,8 @@ export function buildDefaultChainState(tokenId) {
     lastTransferBlock: null,
     lastSaleBlock: null,
     lastSalePriceWei: null,
+    lastSalePriceEth: null,
+    saleTier: "none",
     latestBlock: null,
     gasGwei: null,
     gasLevel: "idle",
@@ -57,6 +62,8 @@ export async function readTokenChainState(env, tokenId) {
       lastTransferBlock: row.last_transfer_block,
       lastSaleBlock: row.last_sale_block,
       lastSalePriceWei: row.last_sale_price_wei,
+      lastSalePriceEth: weiToEthString(row.last_sale_price_wei),
+      saleTier: saleTierFromWei(row.last_sale_price_wei),
       latestBlock: null,
       gasGwei: null,
       gasLevel: "idle",
@@ -149,50 +156,136 @@ export async function syncChainState(env, options = {}) {
     };
   }
 
-  const maxRange = Math.max(1, Math.min(cleanInteger(env.INDEXER_MAX_BLOCK_RANGE, 1000), 5000));
-  const toBlock = Math.min(safeLatestBlock, fromBlock + maxRange - 1);
-  const logs = await rpc(env, "eth_getLogs", [
-    {
-      address: COLLECTION.contractAddress,
-      fromBlock: toQuantity(fromBlock),
-      toBlock: toQuantity(toBlock),
-      topics: [TRANSFER_TOPIC]
-    }
-  ]);
+  const maxRange = Math.max(1, Math.min(cleanInteger(env.INDEXER_MAX_BLOCK_RANGE, DEFAULT_MAX_BLOCK_RANGE), HARD_MAX_BLOCK_RANGE));
+  const requestedToBlock = Math.min(safeLatestBlock, fromBlock + maxRange - 1);
+  const logBatch = await readTransferLogs(env, fromBlock, requestedToBlock);
+  const toBlock = logBatch.toBlock;
+  const logs = logBatch.logs;
 
   const transferLogs = logs
     .map(parseTransferLog)
     .filter(Boolean)
     .sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
-  const txTransferCounts = countTransfersByTransaction(transferLogs);
+  const maxLogsPerRun = Math.max(1, cleanInteger(env.INDEXER_MAX_LOGS_PER_RUN, DEFAULT_MAX_LOGS_PER_RUN));
+  const plan = buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun);
+  const txTransferCounts = countTransfersByTransaction(plan.logsToProcess);
   const txValueCache = new Map();
   let transfersProcessed = 0;
   let salesDetected = 0;
 
-  for (const log of transferLogs) {
+  for (const log of plan.logsToProcess) {
     const result = await applyTransferLog(env, log, txTransferCounts, txValueCache);
     if (result.processed) transfersProcessed += 1;
     if (result.saleDetected) salesDetected += 1;
   }
 
-  await writeCheckpoint(env, toBlock, {
+  await writeCheckpoint(env, plan.checkpointToBlock, {
     reason: options.reason || "manual",
     latestBlock,
     safeLatestBlock,
-    logsSeen: logs.length,
+    requestedFromBlock: fromBlock,
+    requestedToBlock,
+    effectiveToBlock: toBlock,
+    logFetchAttempts: logBatch.attempts,
+    rawLogsFetched: logs.length,
+    logsSeen: transferLogs.length,
+    logsProcessed: plan.logsToProcess.length,
+    logsDeferred: plan.logsDeferred,
     transfersProcessed,
-    salesDetected
+    salesDetected,
+    partial: plan.partial
   });
 
   return {
     ok: true,
     fromBlock,
     toBlock,
+    indexedToBlock: plan.checkpointToBlock,
     latestBlock,
     safeLatestBlock,
-    logsSeen: logs.length,
+    requestedToBlock,
+    logFetchAttempts: logBatch.attempts,
+    logsSeen: transferLogs.length,
+    logsProcessed: plan.logsToProcess.length,
+    logsDeferred: plan.logsDeferred,
     transfersProcessed,
-    salesDetected
+    salesDetected,
+    partial: plan.partial
+  };
+}
+
+async function readTransferLogs(env, fromBlock, requestedToBlock) {
+  let rangeSize = Math.max(1, requestedToBlock - fromBlock + 1);
+  let attempts = 0;
+  let lastError = null;
+
+  while (rangeSize >= 1) {
+    const toBlock = Math.min(requestedToBlock, fromBlock + rangeSize - 1);
+    attempts += 1;
+    try {
+      const logs = await rpc(env, "eth_getLogs", [
+        {
+          address: COLLECTION.contractAddress,
+          fromBlock: toQuantity(fromBlock),
+          toBlock: toQuantity(toBlock),
+          topics: [TRANSFER_TOPIC]
+        }
+      ]);
+      return { logs, toBlock, requestedToBlock, attempts };
+    } catch (error) {
+      lastError = error;
+      if (rangeSize === 1) break;
+      rangeSize = Math.max(1, Math.floor(rangeSize / 2));
+    }
+  }
+
+  throw lastError || new Error("Unable to fetch transfer logs.");
+}
+
+export function buildTransferProcessingPlan(transferLogs, fromBlock, toBlock, maxLogsPerRun) {
+  const sortedLogs = [...transferLogs].sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
+  if (!sortedLogs.length) {
+    return {
+      logsToProcess: [],
+      checkpointToBlock: toBlock,
+      logsDeferred: 0,
+      partial: false
+    };
+  }
+
+  const budget = Math.max(1, Math.floor(Number(maxLogsPerRun) || DEFAULT_MAX_LOGS_PER_RUN));
+  const logsToProcess = [];
+  let cursor = 0;
+  let checkpointToBlock = fromBlock - 1;
+
+  while (cursor < sortedLogs.length) {
+    const blockNumber = sortedLogs[cursor].blockNumber;
+    const blockLogs = [];
+    while (cursor < sortedLogs.length && sortedLogs[cursor].blockNumber === blockNumber) {
+      blockLogs.push(sortedLogs[cursor]);
+      cursor += 1;
+    }
+
+    const wouldExceedBudget = logsToProcess.length > 0 && logsToProcess.length + blockLogs.length > budget;
+    if (wouldExceedBudget) {
+      cursor -= blockLogs.length;
+      break;
+    }
+
+    logsToProcess.push(...blockLogs);
+    checkpointToBlock = blockNumber;
+
+    if (logsToProcess.length >= budget) {
+      break;
+    }
+  }
+
+  const partial = cursor < sortedLogs.length;
+  return {
+    logsToProcess,
+    checkpointToBlock: partial ? checkpointToBlock : toBlock,
+    logsDeferred: sortedLogs.length - logsToProcess.length,
+    partial
   };
 }
 
@@ -313,14 +406,49 @@ async function writeCheckpoint(env, indexedToBlock, payload) {
 
 function withComputedState(state, metrics) {
   const holderAgeDays = estimateHolderAgeDays(state.holderSinceBlock, metrics.latestBlock);
+  const saleTier = state.saleTier || saleTierFromWei(state.lastSalePriceWei);
   return {
     ...state,
+    saleTier,
+    lastSalePriceEth: state.lastSalePriceEth ?? weiToEthString(state.lastSalePriceWei),
     holderAgeDays,
     latestBlock: metrics.latestBlock,
     gasGwei: metrics.gasGwei,
     gasLevel: metrics.gasLevel,
     evolutionTier: evolutionTier(holderAgeDays)
   };
+}
+
+export function saleTierFromWei(value) {
+  const wei = parseWei(value);
+  if (wei >= 10000000000000000000n) return "mythic";
+  if (wei >= 7000000000000000000n) return "legendary";
+  if (wei >= 5000000000000000000n) return "royal";
+  if (wei >= 2000000000000000000n) return "gold";
+  if (wei >= 1000000000000000000n) return "silver";
+  if (wei > 0n) return "verified";
+  return "none";
+}
+
+function weiToEthString(value) {
+  const wei = parseWei(value);
+  if (wei <= 0n) return null;
+  const whole = wei / 1000000000000000000n;
+  const fraction = wei % 1000000000000000000n;
+  const fractionText = fraction.toString().padStart(18, "0").replace(/0+$/, "");
+  return fractionText ? `${whole}.${fractionText}` : whole.toString();
+}
+
+function parseWei(value) {
+  if (typeof value === "bigint") return value > 0n ? value : 0n;
+  const text = String(value || "").trim();
+  if (!/^\d+$/.test(text)) return 0n;
+  try {
+    const wei = BigInt(text);
+    return wei > 0n ? wei : 0n;
+  } catch {
+    return 0n;
+  }
 }
 
 function estimateHolderAgeDays(holderSinceBlock, latestBlock) {

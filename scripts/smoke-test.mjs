@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { buildTransferProcessingPlan, saleTierFromWei } from "../src/chainState.js";
 import worker from "../src/index.js";
 
 const env = {
@@ -45,6 +46,51 @@ async function call(path, init = {}) {
   assert.equal(body.chainState.tokenId, 1);
   assert.equal(body.chainState.saleCount, 0);
   assert.equal(body.chainState.evolutionTier, "new");
+}
+
+{
+  const logs = [
+    { blockNumber: 10, logIndex: 0 },
+    { blockNumber: 10, logIndex: 1 },
+    { blockNumber: 11, logIndex: 0 },
+    { blockNumber: 11, logIndex: 1 },
+    { blockNumber: 11, logIndex: 2 },
+    { blockNumber: 12, logIndex: 0 }
+  ];
+  const plan = buildTransferProcessingPlan(logs, 10, 20, 4);
+  assert.equal(plan.logsToProcess.length, 2);
+  assert.equal(plan.checkpointToBlock, 10);
+  assert.equal(plan.logsDeferred, 4);
+  assert.equal(plan.partial, true);
+}
+
+{
+  const logs = [
+    { blockNumber: 30, logIndex: 0 },
+    { blockNumber: 30, logIndex: 1 },
+    { blockNumber: 30, logIndex: 2 },
+    { blockNumber: 30, logIndex: 3 },
+    { blockNumber: 31, logIndex: 0 }
+  ];
+  const plan = buildTransferProcessingPlan(logs, 30, 31, 2);
+  assert.equal(plan.logsToProcess.length, 4);
+  assert.equal(plan.checkpointToBlock, 30);
+  assert.equal(plan.logsDeferred, 1);
+  assert.equal(plan.partial, true);
+}
+
+{
+  const plan = buildTransferProcessingPlan([], 40, 55, 1000);
+  assert.equal(plan.logsToProcess.length, 0);
+  assert.equal(plan.checkpointToBlock, 55);
+  assert.equal(plan.partial, false);
+}
+
+{
+  assert.equal(saleTierFromWei("239415000000000"), "verified");
+  assert.equal(saleTierFromWei("5300000000000000"), "verified");
+  assert.equal(saleTierFromWei("1000000000000000000"), "silver");
+  assert.equal(saleTierFromWei("10000000000000000000"), "mythic");
 }
 
 {
