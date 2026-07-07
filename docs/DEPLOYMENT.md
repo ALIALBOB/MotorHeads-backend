@@ -32,7 +32,7 @@ ALLOW_UNVERIFIED_WRITES = "false"
 MOTORHEADS_DEPLOY_BLOCK = "replace-with-contract-deploy-block"
 INDEXER_CONFIRMATIONS = "6"
 INDEXER_MAX_BLOCK_RANGE = "1000"
-INDEXER_MAX_LOGS_PER_RUN = "15"
+INDEXER_MAX_LOGS_PER_RUN = "50"
 GAS_LOW_GWEI = "15"
 GAS_MEDIUM_GWEI = "45"
 GAS_HIGH_GWEI = "90"
@@ -88,6 +88,7 @@ curl -X POST https://your-worker-url/v1/indexer/run \
 
 The first backfill may need multiple runs because `INDEXER_MAX_BLOCK_RANGE` keeps each request small enough for Worker/RPC limits.
 The indexer also respects `INDEXER_MAX_LOGS_PER_RUN` and checkpoints after complete blocks, so quiet ranges can move fast while busy
-sale/transfer ranges stay safer for the Cloudflare Free D1 query budget.
+sale/transfer ranges stay safer for the Cloudflare Free D1 query budget. Keep cron at every 5 minutes unless live checkpoints
+show repeated deferred logs; increasing the log budget is cheaper than increasing Worker invocations.
 When one block contains more logs than the per-run budget, the checkpoint payload stores a log-index cursor and resumes inside that
 same block on the next cron run instead of skipping unprocessed events.
