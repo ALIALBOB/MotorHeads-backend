@@ -61,7 +61,7 @@ export async function readTokenChainState(env, tokenId) {
       holderAgeDays: 0,
       lastTransferBlock: row.last_transfer_block,
       lastSaleBlock: row.last_sale_block,
-      lastSalePriceWei: row.last_sale_price_wei,
+      lastSalePriceWei: saleWeiForAnimation(row.last_sale_price_wei),
       lastSalePriceEth: weiToEthString(row.last_sale_price_wei),
       saleTier: saleTierFromWei(row.last_sale_price_wei),
       latestBlock: null,
@@ -454,6 +454,15 @@ export function saleTierFromWei(value) {
   if (wei >= 1000000000000000000n) return "silver";
   if (wei > 0n) return "verified";
   return "none";
+}
+
+export function saleWeiForAnimation(value) {
+  const wei = parseWei(value);
+  if (wei <= 0n) return null;
+  const text = wei.toString();
+  // The live pinned animation parser treats short decimal saleWei values as ETH.
+  // Left-padding keeps the same wei integer while forcing the animation's wei path.
+  return text.length < 16 ? text.padStart(16, "0") : text;
 }
 
 function weiToEthString(value) {

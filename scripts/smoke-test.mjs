@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildTransferProcessingPlan, saleTierFromWei } from "../src/chainState.js";
+import { buildTransferProcessingPlan, saleTierFromWei, saleWeiForAnimation } from "../src/chainState.js";
 import worker from "../src/index.js";
 
 const env = {
@@ -109,6 +109,9 @@ async function call(path, init = {}) {
   assert.equal(saleTierFromWei("5300000000000000"), "verified");
   assert.equal(saleTierFromWei("1000000000000000000"), "silver");
   assert.equal(saleTierFromWei("10000000000000000000"), "mythic");
+  assert.equal(saleWeiForAnimation("378873333333333"), "0378873333333333");
+  assert.equal(saleWeiForAnimation("1471150000000000"), "1471150000000000");
+  assert.equal(saleWeiForAnimation(null), null);
 }
 
 {
