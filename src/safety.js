@@ -6,10 +6,6 @@ export function isEmergencyReadOnly(env = {}) {
   return flag(env.EMERGENCY_READ_ONLY) || flag(env.MOTORHEADS_READ_ONLY);
 }
 
-export function isPublicReadsBlocked(env = {}) {
-  return flag(env.EMERGENCY_BLOCK_PUBLIC_READS) || flag(env.MOTORHEADS_OFFLINE);
-}
-
 export function isIndexerDisabled(env = {}) {
   return isEmergencyReadOnly(env) || flag(env.INDEXER_DISABLED) || String(env.INDEXER_ENABLED || "true").toLowerCase() === "false";
 }
@@ -17,7 +13,6 @@ export function isIndexerDisabled(env = {}) {
 export function safetySnapshot(env = {}) {
   return {
     emergencyReadOnly: isEmergencyReadOnly(env),
-    publicReadsBlocked: isPublicReadsBlocked(env),
     indexerEnabled: !isIndexerDisabled(env),
     budgets: {
       indexerRunsPerDay: readLimit(env.SAFETY_MAX_INDEXER_RUNS_PER_DAY, DEFAULT_INDEXER_RUN_LIMIT),

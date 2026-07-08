@@ -5,7 +5,6 @@ import { corsHeaders, errorJson, json } from "./responses.js";
 import {
   guardRegistryWrite,
   isIndexerDisabled,
-  isPublicReadsBlocked,
   safetySnapshot
 } from "./safety.js";
 import {
@@ -82,10 +81,6 @@ async function route(request, env) {
   }
 
   if (request.method === "GET" && pathname === "/v1/chain/summary") {
-    if (isPublicReadsBlocked(env)) {
-      return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
-    }
-
     return json({ ok: true, chain: await readChainSummary(env) }, {}, env);
   }
 
@@ -128,10 +123,6 @@ async function handleTokenState(request, env, rawTokenId) {
   }
 
   if (request.method === "GET") {
-    if (isPublicReadsBlocked(env)) {
-      return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
-    }
-
     return json({ ok: true, state: await readVisualState(env, tokenId) }, {}, env);
   }
 
@@ -180,10 +171,6 @@ async function handleAgent(request, env, rawTokenId) {
 
   if (request.method !== "GET") {
     return errorJson(405, "method_not_allowed", "Use GET for agent profiles.", undefined, env);
-  }
-
-  if (isPublicReadsBlocked(env)) {
-    return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
   }
 
   return json({ ok: true, agent: await readAgentProfile(env, tokenId) }, {}, env);
@@ -261,10 +248,6 @@ async function handleTokenChainState(request, env, rawTokenId) {
 
   if (request.method !== "GET") {
     return errorJson(405, "method_not_allowed", "Use GET for token chain state.", undefined, env);
-  }
-
-  if (isPublicReadsBlocked(env)) {
-    return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
   }
 
   return json({ ok: true, chainState: await readTokenChainState(env, tokenId) }, {}, env);

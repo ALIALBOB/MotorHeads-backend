@@ -134,14 +134,6 @@ async function call(path, init = {}) {
 }
 
 {
-  const offlineEnv = { ...env, EMERGENCY_BLOCK_PUBLIC_READS: "true" };
-  const response = await worker.fetch(new Request("https://api.motorheads.local/v1/tokens/1/chain-state"), offlineEnv, {});
-  const body = await response.json();
-  assert.equal(response.status, 503);
-  assert.equal(body.error.code, "public_reads_blocked");
-}
-
-{
   assert.equal(safetySnapshot({ INDEXER_ENABLED: "false" }).indexerEnabled, false);
   assert.equal(safetySnapshot({ EMERGENCY_READ_ONLY: "true" }).emergencyReadOnly, true);
 }

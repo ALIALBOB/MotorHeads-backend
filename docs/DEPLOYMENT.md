@@ -37,7 +37,6 @@ GAS_LOW_GWEI = "15"
 GAS_MEDIUM_GWEI = "45"
 GAS_HIGH_GWEI = "90"
 EMERGENCY_READ_ONLY = "false"
-EMERGENCY_BLOCK_PUBLIC_READS = "false"
 INDEXER_ENABLED = "true"
 SAFETY_MAX_INDEXER_RUNS_PER_DAY = "320"
 SAFETY_MAX_RPC_CALLS_PER_DAY = "5000"
@@ -50,8 +49,8 @@ Safety switches:
 
 - `EMERGENCY_READ_ONLY=true` stops cron indexing, manual indexer runs, and registry writes while cached public reads keep working for the live NFT animations.
 - `INDEXER_ENABLED=false` stops only the chain indexer.
-- `EMERGENCY_BLOCK_PUBLIC_READS=true` is the hard emergency brake for public read routes. Use only if the Worker is under abusive traffic, because pinned animations will receive safety errors.
 - `SAFETY_MAX_INDEXER_RUNS_PER_DAY`, `SAFETY_MAX_RPC_CALLS_PER_DAY`, and `SAFETY_MAX_REGISTRY_WRITES_PER_DAY` are soft daily guards stored in D1. When a guard is exhausted, protected work returns a safety error instead of continuing.
+- Public read routes are intentionally not safety-blocked. Pinned NFT animations must keep rendering even if chain data is stale or missing.
 
 Cloudflare budget alerts are still required for billing warnings. These Worker switches are an application brake, not a billing-system hard cap.
 Set or change them in Cloudflare under Workers & Pages -> motorheads-backend -> Settings -> Variables, then save/deploy the Worker.

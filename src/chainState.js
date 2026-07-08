@@ -31,21 +31,39 @@ export function buildDefaultChainState(tokenId) {
   };
 }
 
+export function buildDefaultChainSummary(env = {}) {
+  return {
+    latestBlock: null,
+    indexedToBlock: null,
+    gasWei: null,
+    gasGwei: null,
+    gasLevel: "idle",
+    updatedAt: null,
+    source: env.DB ? "empty" : "default"
+  };
+}
+
 export async function readTokenChainState(env, tokenId) {
-  const metrics = await readChainSummary(env);
+  const metrics = await safeReadChainSummary(env);
   if (!env.DB) {
     return withComputedState(buildDefaultChainState(tokenId), metrics);
   }
 
-  const row = await env.DB
-    .prepare(
-      `SELECT token_id, owner_address, minted_at_block, holder_since_block, last_transfer_block,
-        transfer_count, sale_count, last_sale_block, last_sale_price_wei, updated_at
-       FROM token_chain_state
-       WHERE token_id = ?`
-    )
-    .bind(tokenId)
-    .first();
+  let row = null;
+  try {
+    row = await env.DB
+      .prepare(
+        `SELECT token_id, owner_address, minted_at_block, holder_since_block, last_transfer_block,
+          transfer_count, sale_count, last_sale_block, last_sale_price_wei, updated_at
+         FROM token_chain_state
+         WHERE token_id = ?`
+      )
+      .bind(tokenId)
+      .first();
+  } catch (error) {
+    console.error("MotorHeads chain-state read fell back to default", error);
+    return withComputedState({ ...buildDefaultChainState(tokenId), source: "fallback" }, metrics);
+  }
 
   if (!row) {
     return withComputedState(buildDefaultChainState(tokenId), metrics);
@@ -77,15 +95,7 @@ export async function readTokenChainState(env, tokenId) {
 }
 
 export async function readChainSummary(env) {
-  const fallback = {
-    latestBlock: null,
-    indexedToBlock: null,
-    gasWei: null,
-    gasGwei: null,
-    gasLevel: "idle",
-    updatedAt: null,
-    source: env.DB ? "empty" : "default"
-  };
+  const fallback = buildDefaultChainSummary(env);
 
   if (!env.DB) {
     return fallback;
@@ -116,6 +126,15 @@ export async function readChainSummary(env) {
     updatedAt: metrics?.updated_at || checkpoint?.updated_at || null,
     source: "indexer"
   };
+}
+
+async function safeReadChainSummary(env) {
+  try {
+    return await readChainSummary(env);
+  } catch (error) {
+    console.error("MotorHeads chain summary read fell back to default", error);
+    return { ...buildDefaultChainSummary(env), source: "fallback" };
+  }
 }
 
 export async function syncChainState(env, options = {}) {
