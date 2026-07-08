@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildTransferProcessingPlan, saleTierFromWei, saleWeiForAnimation } from "../src/chainState.js";
+import { safetySnapshot } from "../src/safety.js";
 import worker from "../src/index.js";
 
 const env = {
@@ -20,12 +21,14 @@ async function call(path, init = {}) {
   const { response, body } = await call("/health");
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
+  assert.equal(body.safety.indexerEnabled, true);
 }
 
 {
   const { response, body } = await call("/v1/config");
   assert.equal(response.status, 200);
   assert.equal(body.collection.maxSupply, 5555);
+  assert.equal(body.safety.emergencyReadOnly, false);
 }
 
 {
@@ -128,6 +131,19 @@ async function call(path, init = {}) {
   });
   assert.equal(response.status, 401);
   assert.equal(body.error.code, "signature_required");
+}
+
+{
+  const offlineEnv = { ...env, EMERGENCY_BLOCK_PUBLIC_READS: "true" };
+  const response = await worker.fetch(new Request("https://api.motorheads.local/v1/tokens/1/chain-state"), offlineEnv, {});
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.error.code, "public_reads_blocked");
+}
+
+{
+  assert.equal(safetySnapshot({ INDEXER_ENABLED: "false" }).indexerEnabled, false);
+  assert.equal(safetySnapshot({ EMERGENCY_READ_ONLY: "true" }).emergencyReadOnly, true);
 }
 
 console.log("MotorHeads backend smoke test passed.");

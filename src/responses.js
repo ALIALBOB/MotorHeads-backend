@@ -3,7 +3,7 @@ export function corsHeaders(env = {}) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,PUT,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type,X-Wallet-Address,X-Signature,X-Signed-Message",
+    "Access-Control-Allow-Headers": "Content-Type,X-Wallet-Address,X-Signature,X-Signed-Message,X-Indexer-Token",
     "Access-Control-Max-Age": "86400"
   };
 }
@@ -36,4 +36,3 @@ export function errorJson(status, code, message, details = undefined, env = {}) 
     env
   );
 }
-

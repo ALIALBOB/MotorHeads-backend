@@ -79,6 +79,15 @@ CREATE TABLE IF NOT EXISTS part_catalog (
   active INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS safety_budget_daily (
+  budget_key TEXT NOT NULL,
+  day_key TEXT NOT NULL,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  limit_count INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (budget_key, day_key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_event_log_token_id ON event_log(token_id);
 CREATE INDEX IF NOT EXISTS idx_event_log_owner_address ON event_log(owner_address);
 CREATE INDEX IF NOT EXISTS idx_token_visual_state_owner_address ON token_visual_state(owner_address);

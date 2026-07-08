@@ -3,6 +3,12 @@ import { PART_LIBRARY } from "./parts.js";
 import { readChainSummary, readTokenChainState, syncChainState } from "./chainState.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
 import {
+  guardRegistryWrite,
+  isIndexerDisabled,
+  isPublicReadsBlocked,
+  safetySnapshot
+} from "./safety.js";
+import {
   awakenAgent,
   isEthAddress,
   parseTokenId,
@@ -28,6 +34,11 @@ export default {
   },
 
   async scheduled(event, env = {}, ctx = {}) {
+    if (isIndexerDisabled(env)) {
+      console.warn("MotorHeads chain indexer skipped by safety switch.");
+      return;
+    }
+
     ctx.waitUntil(
       syncChainState(env, { reason: event?.cron || "cron" }).catch((error) => {
         console.error("MotorHeads chain indexer failed", error);
@@ -45,7 +56,7 @@ async function route(request, env) {
   }
 
   if (request.method === "GET" && pathname === "/health") {
-    return json({ ok: true, version: API_VERSION, time: new Date().toISOString() }, {}, env);
+    return json({ ok: true, version: API_VERSION, time: new Date().toISOString(), safety: safetySnapshot(env) }, {}, env);
   }
 
   if (request.method === "GET" && pathname === "/v1/config") {
@@ -58,7 +69,8 @@ async function route(request, env) {
         registry: {
           visualState: Boolean(env.DB),
           signatureWrites: env.ALLOW_UNVERIFIED_WRITES === "true" ? "dev-only" : "required"
-        }
+        },
+        safety: safetySnapshot(env)
       },
       {},
       env
@@ -70,6 +82,10 @@ async function route(request, env) {
   }
 
   if (request.method === "GET" && pathname === "/v1/chain/summary") {
+    if (isPublicReadsBlocked(env)) {
+      return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
+    }
+
     return json({ ok: true, chain: await readChainSummary(env) }, {}, env);
   }
 
@@ -112,6 +128,10 @@ async function handleTokenState(request, env, rawTokenId) {
   }
 
   if (request.method === "GET") {
+    if (isPublicReadsBlocked(env)) {
+      return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
+    }
+
     return json({ ok: true, state: await readVisualState(env, tokenId) }, {}, env);
   }
 
@@ -132,6 +152,11 @@ async function handleTokenState(request, env, rawTokenId) {
       { next: "Verify the signed message matches the wallet and token ownership before enabling writes." },
       env
     );
+  }
+
+  const writeGuard = await guardRegistryWrite(env);
+  if (!writeGuard.allowed) {
+    return safetyError(writeGuard, env);
   }
 
   if (!env.DB) {
@@ -155,6 +180,10 @@ async function handleAgent(request, env, rawTokenId) {
 
   if (request.method !== "GET") {
     return errorJson(405, "method_not_allowed", "Use GET for agent profiles.", undefined, env);
+  }
+
+  if (isPublicReadsBlocked(env)) {
+    return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
   }
 
   return json({ ok: true, agent: await readAgentProfile(env, tokenId) }, {}, env);
@@ -183,6 +212,11 @@ async function handleAwaken(request, env, rawTokenId) {
       undefined,
       env
     );
+  }
+
+  const writeGuard = await guardRegistryWrite(env);
+  if (!writeGuard.allowed) {
+    return safetyError(writeGuard, env);
   }
 
   if (!env.DB) {
@@ -229,10 +263,18 @@ async function handleTokenChainState(request, env, rawTokenId) {
     return errorJson(405, "method_not_allowed", "Use GET for token chain state.", undefined, env);
   }
 
+  if (isPublicReadsBlocked(env)) {
+    return errorJson(503, "public_reads_blocked", "MotorHeads public reads are disabled by the emergency safety switch.", undefined, env);
+  }
+
   return json({ ok: true, chainState: await readTokenChainState(env, tokenId) }, {}, env);
 }
 
 async function handleIndexerRun(request, env) {
+  if (isIndexerDisabled(env)) {
+    return errorJson(503, "indexer_disabled", "The MotorHeads indexer is disabled by the safety switch.", safetySnapshot(env), env);
+  }
+
   if (!env.INDEXER_ADMIN_TOKEN) {
     return errorJson(
       501,
@@ -255,6 +297,11 @@ async function handleIndexerRun(request, env) {
   } catch (error) {
     return errorJson(500, "indexer_failed", error.message || "The chain indexer failed.", undefined, env);
   }
+}
+
+function safetyError(guard, env) {
+  const status = guard.code === "daily_budget_exhausted" ? 429 : 503;
+  return errorJson(status, guard.code || "safety_blocked", guard.message || "Blocked by MotorHeads safety guard.", guard.details, env);
 }
 
 async function readJsonBody(request, env) {

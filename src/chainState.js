@@ -1,4 +1,5 @@
 import { COLLECTION } from "./contracts.js";
+import { guardIndexerRun, guardRpcCall } from "./safety.js";
 
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -120,6 +121,11 @@ export async function readChainSummary(env) {
 export async function syncChainState(env, options = {}) {
   if (!env.DB) {
     return { ok: false, skipped: true, reason: "db_missing" };
+  }
+
+  const indexerGuard = await guardIndexerRun(env);
+  if (!indexerGuard.allowed) {
+    return { ok: false, skipped: true, reason: indexerGuard.code, safety: indexerGuard.details };
   }
 
   if (!env.ETH_RPC_URL) {
@@ -541,6 +547,11 @@ function countTransfersByTransaction(logs) {
 }
 
 async function rpc(env, method, params = []) {
+  const rpcGuard = await guardRpcCall(env);
+  if (!rpcGuard.allowed) {
+    throw new Error(`${rpcGuard.message} ${JSON.stringify(rpcGuard.details)}`);
+  }
+
   const response = await fetch(env.ETH_RPC_URL, {
     method: "POST",
     headers: { "content-type": "application/json" },
