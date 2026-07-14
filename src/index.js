@@ -1,6 +1,7 @@
 import { COLLECTION, CIDS, NETWORK } from "./contracts.js";
 import { PART_LIBRARY } from "./parts.js";
 import { readChainSummary, readTokenChainState, syncChainState } from "./chainState.js";
+import { routeCustomizationRequest } from "./customization/routes.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
 import {
   guardRegistryWrite,
@@ -20,6 +21,11 @@ const API_VERSION = "2026-06-08";
 
 export default {
   async fetch(request, env = {}, ctx = {}) {
+    const customizationResponse = await routeCustomizationRequest(request, env, ctx);
+    if (customizationResponse) {
+      return customizationResponse;
+    }
+
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }

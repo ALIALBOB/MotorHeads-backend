@@ -5,15 +5,31 @@
   "type": "module",
   "description": "MotorHeads registry and agent API for owner-edited NFT visuals.",
   "scripts": {
-    "check": "node --check src/index.js && node --check src/state.js && node --check src/chainState.js && node --check src/responses.js && node --check src/contracts.js && node --check src/parts.js && node --check src/safety.js && node --check scripts/smoke-test.mjs && node --check scripts/dev-server.mjs",
+    "check": "node --check src/index.js && node --check src/state.js && node --check src/chainState.js && node --check src/responses.js && node --check src/contracts.js && node --check src/parts.js && node --check src/safety.js && node --check src/customization/auth.js && node --check src/customization/cleanup.js && node --check src/customization/configuration.js && node --check src/customization/http.js && node --check src/customization/ownership.js && node --check src/customization/routes.js && node --check scripts/smoke-test.mjs && node --check scripts/dev-server.mjs && node --check scripts/run-customization-tests.mjs && node --check scripts/prove-customization-beta.mjs && node --check scripts/cleanup-customization-data.mjs && node --check tests/customization/local-proof.mjs && node --check tests/customization/hardening-suite.mjs",
     "test": "node scripts/smoke-test.mjs",
+    "test:auth": "node scripts/run-customization-tests.mjs --group=auth",
+    "test:ownership": "node scripts/run-customization-tests.mjs --group=ownership",
+    "test:customization-api": "node scripts/run-customization-tests.mjs --group=api",
+    "test:hardening": "node scripts/run-customization-tests.mjs --group=hardening",
+    "test:customization": "node scripts/run-customization-tests.mjs",
+    "customization:cleanup:local": "node scripts/cleanup-customization-data.mjs",
+    "proof:customization": "node scripts/prove-customization-beta.mjs",
     "dev:node": "node scripts/dev-server.mjs",
     "dev": "npx wrangler dev",
+    "dev:customization": "npx wrangler dev --local --var CUSTOMIZATION_READS_ENABLED:true --var CUSTOMIZATION_WRITES_ENABLED:true --var CUSTOMIZATION_AUTH_ENABLED:true --var CUSTOMIZATION_SIWE_DOMAIN:localhost:5173 --var CUSTOMIZATION_SIWE_URI:http://localhost:5173 --var CUSTOMIZATION_COOKIE_SECURE:false",
     "deploy": "npx wrangler deploy",
     "db:migrate:local": "npx wrangler d1 execute motorheads_registry --local --file=schema.sql",
     "db:migrate:prod": "npx wrangler d1 execute motorheads_registry --remote --file=schema.sql"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "dependencies": {
+    "viem": "2.55.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1",
+    "miniflare": "4.20260708.1",
+    "wrangler": "4.110.0"
   }
 }

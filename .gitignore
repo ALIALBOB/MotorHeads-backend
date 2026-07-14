@@ -14,3 +14,10 @@ captures/
 *.car
 *.cid
 secrets*.json
+reports/pre-customization-backend.patch
+reports/customization-backend-beta/pre-phase3a1-*
+reports/customization-backend-beta/capture-pre-phase3a1-hashes.mjs
+reports/customization-backend-beta/*-test-results.json
+reports/customization-backend-beta/regression-results.json
+reports/customization-backend-beta/local-proof-results.json
+reports/customization-backend-beta/migration-audit.json
