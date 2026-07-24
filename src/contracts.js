@@ -18,9 +18,10 @@ export const COLLECTION = {
   provenanceHash: "0x95ff6e7da1d0bc64862ded046c786433cf1af2852fbc8f408020b323728bc996"
 };
 
+// Must match the live on-chain tokenURI/baseURI. Verified against tokenURI(1) on 2026-07-24.
 export const CIDS = {
-  baseUri: "ipfs://bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/",
+  baseUri: "ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/",
   images: "bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq",
-  animations: "bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq",
+  animations: "bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq",
   contractMetadata: "bafybeicgckcmtjt63iwxgbkr3jouzcabpxncs5qcp4vunlfiirlgeb344a"
 };

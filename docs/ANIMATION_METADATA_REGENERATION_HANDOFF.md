@@ -2,6 +2,14 @@
 
 Last updated: 2026-06-10
 
+> **SUPERSEDED (2026-07-24).** The regeneration described below has since completed. The live on-chain state is now:
+> - Base URI: `ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/` (verified against `tokenURI(1)` on mainnet)
+> - Animations CID: `bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq`
+> - Images CID: `bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq` (unchanged)
+> - Contract metadata CID: `bafybeicgckcmtjt63iwxgbkr3jouzcabpxncs5qcp4vunlfiirlgeb344a` (unchanged)
+>
+> The "Current Live State" and "Final candidate" CIDs below are the **pre-regeneration** baseline and are kept as a historical record. Do not treat them as current chain state.
+
 This note is the production checkpoint before regenerating MotorHeads animation files and metadata. Use it when a new chat/session needs to resume the work.
 
 ## Current Live State
