@@ -32,7 +32,11 @@ def post_discord(content):
         "username": "MotorHeads Indexer",
         "allowed_mentions": {"parse": []},
     }).encode()
-    req = urllib.request.Request(WEBHOOK, data=body, headers={"content-type": "application/json"})
+    # A real User-Agent — Cloudflare (in front of Discord) 403s the default python-urllib UA.
+    req = urllib.request.Request(WEBHOOK, data=body, headers={
+        "content-type": "application/json",
+        "user-agent": "MotorHeads-Indexer-Watchdog/1.0 (+github-actions)",
+    })
     with urllib.request.urlopen(req, timeout=20) as r:
         print("Discord webhook status:", r.status)
 
