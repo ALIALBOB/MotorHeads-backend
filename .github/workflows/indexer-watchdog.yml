@@ -1,0 +1,45 @@
+name: indexer-watchdog
+
+# Independent dead-man's switch for the MotorHeads chain indexer.
+# Polls the PUBLIC chain summary; if the indexer is behind AND not catching up
+# (confirmed by a second reading), it pings Discord. Runs even if the worker is dead,
+# so it catches a total outage — not just a slow crawl.
+#
+# Setup (one time):
+#   1. Create a Discord webhook for your log channel (Channel → Edit → Integrations → Webhooks).
+#   2. Add it as a repo secret named DISCORD_ALERT_WEBHOOK_URL
+#      (Settings → Secrets and variables → Actions → New repository secret).
+#   3. This file must be on the DEFAULT branch (main) for the schedule to run.
+#   4. Test: Actions tab → indexer-watchdog → Run workflow → force_ping = true.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # every 30 min (GitHub may delay a few min under load)
+  workflow_dispatch:
+    inputs:
+      force_ping:
+        description: "Send a test ping to Discord regardless of lag"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indexer-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check indexer lag, alert Discord on a confirmed stall
+        env:
+          DISCORD_ALERT_WEBHOOK_URL: ${{ secrets.DISCORD_ALERT_WEBHOOK_URL }}
+          SUMMARY_URL: https://motorheads-backend.zacbosugame.workers.dev/v1/chain/summary
+          LAG_ALERT_BLOCKS: "1500"     # ~5h behind before we even look closer
+          MIN_PROGRESS_BLOCKS: "200"   # a healthy run advances ~1000; a stall ~0-10
+          RECHECK_SECONDS: "360"       # wait 1+ indexer cron cycle to confirm it's stuck
+          FORCE_PING: ${{ github.event.inputs.force_ping }}
+        run: python3 .github/scripts/indexer_watchdog.py
