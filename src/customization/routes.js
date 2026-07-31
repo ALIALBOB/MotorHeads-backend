@@ -20,7 +20,7 @@ import {
   requestEtagMatches
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
-import { readCurrentOwner } from "./ownership.js";
+import { readCurrentOwner, readOwnerBalance } from "./ownership.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -32,8 +32,23 @@ import {
 import { readCustomization, resetCustomization, saveCustomization } from "./storage.js";
 import { validateAndNormalizeState } from "./validation.js";
 
-const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout)$/;
+const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings)$/;
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
+
+// Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
+// May lag the chain (indexer cadence) — the live balanceOf gate below is the authoritative holder check.
+async function listOwnedTokenIds(env, address) {
+  try {
+    const db = env.DB;
+    if (!db || typeof db.prepare !== "function") return [];
+    const res = await db.prepare(
+      "SELECT token_id FROM token_chain_state WHERE lower(owner_address) = ? ORDER BY token_id LIMIT 500"
+    ).bind(String(address).toLowerCase()).all();
+    return (res?.results || []).map((row) => Number(row.token_id)).filter((id) => Number.isInteger(id));
+  } catch {
+    return [];
+  }
+}
 
 function routeIdentity(rawContract, rawTokenId) {
   if (!isAddress(rawContract || "")) throw new ApiError(400, "UNSUPPORTED_COLLECTION", "Only the MotorHeads collection is supported by this beta.");
@@ -73,6 +88,17 @@ async function authRoute(request, env, action) {
     const session = await requireSession(request, env);
     return customizationJson(
       { authenticated: true, address: session.address, expiresAt: new Date(session.expiresAt * 1000).toISOString() },
+      { request, env, methods: "GET,OPTIONS" }
+    );
+  }
+  if (action === "holdings" && request.method === "GET") {
+    // Holder gate: a live balanceOf decides access; owned token IDs come from the indexer mirror.
+    const session = await requireSession(request, env);
+    const balance = await readOwnerBalance(env, CUSTOMIZATION_CONTRACT, session.address);
+    const isHolder = balance > 0;
+    const tokenIds = isHolder ? await listOwnedTokenIds(env, session.address) : [];
+    return customizationJson(
+      { authenticated: true, address: session.address, isHolder, balance, tokenIds },
       { request, env, methods: "GET,OPTIONS" }
     );
   }
