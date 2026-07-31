@@ -109,3 +109,36 @@ export async function readOwnerBalance(env, contractAddress, address) {
     throw unavailable("HOLDER_CHECK_UNAVAILABLE", message);
   }
 }
+
+// Enumerate the token IDs a wallet owns via Alchemy's NFT API (real-time, works in dev + prod).
+// Returns an ascending unique id list, or null when the RPC isn't Alchemy (caller falls back to D1).
+export async function readOwnedTokenIds(env, contractAddress, address, { max = 500 } = {}) {
+  const rpcUrl = String(env.ETH_RPC_URL || "").trim();
+  if (!/alchemy\.com\/v2\//i.test(rpcUrl)) return null;
+  const nftBase = rpcUrl.replace(/\/v2\//i, "/nft/v3/").split("?")[0].replace(/\/$/, "");
+  const ids = [];
+  let pageKey = "";
+  try {
+    for (let page = 0; page < 6 && ids.length < max; page += 1) {
+      const url = `${nftBase}/getNFTsForOwner?owner=${encodeURIComponent(address)}` +
+        `&contractAddresses[]=${encodeURIComponent(contractAddress)}&withMetadata=false&pageSize=100` +
+        (pageKey ? `&pageKey=${encodeURIComponent(pageKey)}` : "");
+      const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) });
+      if (!res.ok) return ids.length ? sortedUnique(ids) : null;
+      const data = await res.json();
+      for (const nft of (Array.isArray(data?.ownedNfts) ? data.ownedNfts : [])) {
+        const id = Number(nft?.tokenId);
+        if (Number.isInteger(id) && id >= 1) ids.push(id);
+      }
+      pageKey = data?.pageKey || "";
+      if (!pageKey) break;
+    }
+    return sortedUnique(ids);
+  } catch {
+    return ids.length ? sortedUnique(ids) : null;
+  }
+}
+
+function sortedUnique(ids) {
+  return Array.from(new Set(ids)).sort((a, b) => a - b);
+}

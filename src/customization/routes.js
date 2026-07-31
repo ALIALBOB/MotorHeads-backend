@@ -20,7 +20,7 @@ import {
   requestEtagMatches
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
-import { readCurrentOwner, readOwnerBalance } from "./ownership.js";
+import { readCurrentOwner, readOwnedTokenIds, readOwnerBalance } from "./ownership.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -96,7 +96,10 @@ async function authRoute(request, env, action) {
     const session = await requireSession(request, env);
     const balance = await readOwnerBalance(env, CUSTOMIZATION_CONTRACT, session.address);
     const isHolder = balance > 0;
-    const tokenIds = isHolder ? await listOwnedTokenIds(env, session.address) : [];
+    // Prefer the live Alchemy NFT API for owned token IDs; fall back to the indexer's D1 mirror.
+    const tokenIds = isHolder
+      ? (await readOwnedTokenIds(env, CUSTOMIZATION_CONTRACT, session.address)) ?? await listOwnedTokenIds(env, session.address)
+      : [];
     return customizationJson(
       { authenticated: true, address: session.address, isHolder, balance, tokenIds },
       { request, env, methods: "GET,OPTIONS" }
