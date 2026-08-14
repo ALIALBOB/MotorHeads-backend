@@ -110,6 +110,21 @@ export async function readOwnerBalance(env, contractAddress, address) {
   }
 }
 
+// A single transient RPC blip on a live balanceOf must NOT read as "not a holder" — that silently LOCKS a
+// real holder's gate / partner collab and, since the client re-reads on every page load, makes access FLAP
+// (works, refresh, locked). Retry a few times with small backoff before surfacing the failure.
+export async function readOwnerBalanceResilient(env, contractAddress, address, attempts = 3) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try { return await readOwnerBalance(env, contractAddress, address); }
+    catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 // Enumerate the token IDs a wallet owns via Alchemy's NFT API (real-time, works in dev + prod).
 // Returns an ascending unique id list, or null when the RPC isn't Alchemy (caller falls back to D1).
 export async function readOwnedTokenIds(env, contractAddress, address, { max = 500 } = {}) {

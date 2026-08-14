@@ -1,4 +1,5 @@
 import { getAddress, isAddress } from "viem";
+import { PARTNER_COLLECTIONS } from "../contracts.js";
 import {
   CUSTOMIZATION_CONTRACT,
   CUSTOMIZATION_TOKEN_MAX,
@@ -20,7 +21,7 @@ import {
   requestEtagMatches
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
-import { readCurrentOwner, readOwnedTokenIds, readOwnerBalance } from "./ownership.js";
+import { readCurrentOwner, readOwnedTokenIds, readOwnerBalanceResilient } from "./ownership.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -94,14 +95,30 @@ async function authRoute(request, env, action) {
   if (action === "holdings" && request.method === "GET") {
     // Holder gate: a live balanceOf decides access; owned token IDs come from the indexer mirror.
     const session = await requireSession(request, env);
-    const balance = await readOwnerBalance(env, CUSTOMIZATION_CONTRACT, session.address);
+    // Core gate = a live balanceOf, resilient to a transient RPC blip so a hiccup can't lock a real holder out.
+    const balance = await readOwnerBalanceResilient(env, CUSTOMIZATION_CONTRACT, session.address);
     const isHolder = balance > 0;
-    // Prefer the live Alchemy NFT API for owned token IDs; fall back to the indexer's D1 mirror.
-    const tokenIds = isHolder
-      ? (await readOwnedTokenIds(env, CUSTOMIZATION_CONTRACT, session.address)) ?? await listOwnedTokenIds(env, session.address)
-      : [];
+    // Owned token IDs and partner-collection holder checks are INDEPENDENT — run them in PARALLEL so the
+    // partner read isn't starved at the tail of a long sequential RPC chain (the main cause of the flaky
+    // Normies lock). Each partner read is retried; if it still fails we flag it `unavailable` (NOT
+    // isHolder:false) so the client can keep the last-known entitlement instead of flapping to LOCKED.
+    const [tokenIds, partnerEntries] = await Promise.all([
+      isHolder
+        // Prefer the live Alchemy NFT API for owned token IDs; fall back to the indexer's D1 mirror.
+        ? readOwnedTokenIds(env, CUSTOMIZATION_CONTRACT, session.address).then((ids) => ids ?? listOwnedTokenIds(env, session.address))
+        : Promise.resolve([]),
+      Promise.all(PARTNER_COLLECTIONS.map(async ({ key, contract }) => {
+        try {
+          const partnerBalance = await readOwnerBalanceResilient(env, contract, session.address);
+          return [key, { balance: partnerBalance, isHolder: partnerBalance > 0 }];
+        } catch {
+          return [key, { balance: 0, isHolder: false, unavailable: true }];
+        }
+      })),
+    ]);
+    const partners = Object.fromEntries(partnerEntries);
     return customizationJson(
-      { authenticated: true, address: session.address, isHolder, balance, tokenIds },
+      { authenticated: true, address: session.address, isHolder, balance, tokenIds, partners },
       { request, env, methods: "GET,OPTIONS" }
     );
   }

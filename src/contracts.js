@@ -1,6 +1,16 @@
 export const MOTORHEADS_CONTRACT = "0x0a5008550fc1402bb567a3ba38d9433e6199ceb1";
 export const TREASURY_WALLET = "0x95A6fB3087b3469Ed777120052E0ac3f262c81C1";
 
+// Partner collections whose holders unlock gated collab traits in the workshop.
+// Normies (ERC-721, Ethereum mainnet) — https://opensea.io/collection/thenormies
+export const NORMIES_CONTRACT = "0x9eb6e2025b64f340691e424b7fe7022ffde12438";
+
+// Partner-collection holder checks surfaced on /v1/auth/holdings, keyed by the flag
+// the frontend reads (e.g. `normies`). Each is a generic ERC-721 balanceOf.
+export const PARTNER_COLLECTIONS = Object.freeze([
+  { key: "normies", contract: NORMIES_CONTRACT }
+]);
+
 export const NETWORK = {
   name: "Ethereum Mainnet",
   chainId: 1,
