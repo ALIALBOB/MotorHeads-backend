@@ -1,6 +1,16 @@
 export const MOTORHEADS_CONTRACT = "0x0a5008550fc1402bb567a3ba38d9433e6199ceb1";
 export const TREASURY_WALLET = "0x95A6fB3087b3469Ed777120052E0ac3f262c81C1";
 
+// Partner collections whose holders unlock gated collab traits in the workshop.
+// Normies (ERC-721, Ethereum mainnet) — https://opensea.io/collection/thenormies
+export const NORMIES_CONTRACT = "0x9eb6e2025b64f340691e424b7fe7022ffde12438";
+
+// Partner-collection holder checks surfaced on /v1/auth/holdings, keyed by the flag
+// the frontend reads (e.g. `normies`). Each is a generic ERC-721 balanceOf.
+export const PARTNER_COLLECTIONS = Object.freeze([
+  { key: "normies", contract: NORMIES_CONTRACT }
+]);
+
 export const NETWORK = {
   name: "Ethereum Mainnet",
   chainId: 1,
@@ -18,9 +28,10 @@ export const COLLECTION = {
   provenanceHash: "0x95ff6e7da1d0bc64862ded046c786433cf1af2852fbc8f408020b323728bc996"
 };
 
+// Must match the live on-chain tokenURI/baseURI. Verified against tokenURI(1) on 2026-07-24.
 export const CIDS = {
-  baseUri: "ipfs://bafybeibsirode2cuztk2zkzsze3wzaktrdn3fk2vkbpuxlf7cldlx53s6m/",
+  baseUri: "ipfs://bafybeieu7bnbl7tiuim6x6gz7pcdfhkq6bh4eas3jteea7sx7kowobe6jy/",
   images: "bafybeihodojvhdsjn6d2romph3jo2u5yexzqidiitnlwshej3u4oaqklxq",
-  animations: "bafybeidpnsa3roqyddqa7vkl3gagyae3kqgqbtwkbybtslkuj7d6vecygq",
+  animations: "bafybeif6hwm5lfl7cmmw2leit5t76t57k5olsx6lrxso22ojbkoh2xcyyq",
   contractMetadata: "bafybeicgckcmtjt63iwxgbkr3jouzcabpxncs5qcp4vunlfiirlgeb344a"
 };

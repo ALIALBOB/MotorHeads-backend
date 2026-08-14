@@ -1,7 +1,10 @@
 import { COLLECTION, CIDS, NETWORK } from "./contracts.js";
 import { PART_LIBRARY } from "./parts.js";
-import { readChainSummary, readTokenChainState, syncChainState } from "./chainState.js";
+import { readChainSummary, readTokenChainState, readTokenEffect, syncChainState } from "./chainState.js";
+import { routeCustomizationRequest } from "./customization/routes.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
+import { recordHit, readStats } from "./stats.js";
+import { handleCrateSign } from "./crate-signer.js";
 import {
   guardRegistryWrite,
   isIndexerDisabled,
@@ -20,6 +23,11 @@ const API_VERSION = "2026-06-08";
 
 export default {
   async fetch(request, env = {}, ctx = {}) {
+    const customizationResponse = await routeCustomizationRequest(request, env, ctx);
+    if (customizationResponse) {
+      return customizationResponse;
+    }
+
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
@@ -86,6 +94,19 @@ async function route(request, env) {
 
   if (request.method === "POST" && pathname === "/v1/indexer/run") {
     return handleIndexerRun(request, env);
+  }
+
+  // Crate opening: holder commits on-chain (requestId), asks for the signed seed here, then submits resolveOpen.
+  if (request.method === "POST" && pathname === "/v1/crate/open") {
+    return handleCrateSign(request, env);
+  }
+
+  // Lightweight monitoring: record a page view; read the dashboard stats (visitors + on-chain edits).
+  if (request.method === "POST" && pathname === "/v1/hit") {
+    return recordHit(request, env);
+  }
+  if (request.method === "GET" && pathname === "/v1/stats") {
+    return readStats(request, env);
   }
 
   const tokenStateMatch = pathname.match(/^\/v1\/tokens\/([^/]+)\/state$/);
@@ -250,7 +271,9 @@ async function handleTokenChainState(request, env, rawTokenId) {
     return errorJson(405, "method_not_allowed", "Use GET for token chain state.", undefined, env);
   }
 
-  return json({ ok: true, chainState: await readTokenChainState(env, tokenId) }, {}, env);
+  const chainState = await readTokenChainState(env, tokenId);
+  chainState.effect = await readTokenEffect(env, tokenId); // applied whole-machine effect (null if none) — drives the live animation FX
+  return json({ ok: true, chainState }, {}, env);
 }
 
 async function handleIndexerRun(request, env) {

@@ -1,0 +1,52 @@
+{
+  "package": "@motorheads/holder-validation",
+  "validationVersion": 1,
+  "catalogVersion": 1,
+  "placementManifestVersion": 1,
+  "generatedAt": "2026-07-13T10:49:43.709Z",
+  "sourceRoot": "MotorHeads-5555",
+  "sourceCommit": "62109522015d28053248b6b63cee10eee49bbfe4",
+  "artifactSha256": "b60342bc8b4e95b33d1404bf3ff0a177f612a5885e3c6227e3091e0d8df6c800",
+  "files": [
+    {
+      "source": "src/lib/validate-holder-layout.js",
+      "artifact": "lib/validate-holder-layout.js",
+      "sha256": "5058e6f0318a56c8595dacbe83fa5b2897330157ef7ba95c58107ca777f560f8"
+    },
+    {
+      "source": "src/lib/resolve-item-autofit.js",
+      "artifact": "lib/resolve-item-autofit.js",
+      "sha256": "699d7ee753a9c37d052bb5e28a3c5e394ce43dc8b79d3b9a65d7329ba38cb4c9"
+    },
+    {
+      "source": "src/lib/clamp-item-adjustment.js",
+      "artifact": "lib/clamp-item-adjustment.js",
+      "sha256": "5bbf01fc9caf3c1610dd76946bbb709b73cd1cbd56d5cf2a8ac2873aca718cc2"
+    },
+    {
+      "source": "src/lib/holder-placement-geometry.js",
+      "artifact": "lib/holder-placement-geometry.js",
+      "sha256": "90c522ac0cc77a5af48e142115f52513978dee391a25e3d759a6071bfdf83a8d"
+    },
+    {
+      "source": "src/data/item-placement-rules.js",
+      "artifact": "data/item-placement-rules.js",
+      "sha256": "d2d196e72e17502241cc5905d5e503850152b4e7a82734bb402d1e842149f3b7"
+    },
+    {
+      "source": "src/data/category-limits.js",
+      "artifact": "data/category-limits.js",
+      "sha256": "b323bf41b3fdbc04fd4b36644bd9c18775d80893f4ca17df68d3455e74ba24d0"
+    },
+    {
+      "source": "src/data/compatibility-rules.js",
+      "artifact": "data/compatibility-rules.js",
+      "sha256": "c073f1af51885bd170a86ea928acb92ff04e90952bf6d25f3b78c30df1f578b8"
+    },
+    {
+      "source": "src/data/placement-overrides.js",
+      "artifact": "data/placement-overrides.js",
+      "sha256": "b9562541936668834b7bf1b6d5707a5e1f38f3e469bbc742c4995e18940180b0"
+    }
+  ]
+}

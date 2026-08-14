@@ -1,0 +1,50 @@
+{
+    "recordedAt":  "2026-07-13T10:13:03.9136056Z",
+    "head":  "c446441ea98acfe9ba92e8e42b2f65063eefad49",
+    "branch":  "feature/website-customization-save-beta",
+    "statusShort":  [
+                        "?? reports/"
+                    ],
+    "files":  [
+                  {
+                      "path":  "src/index.js",
+                      "sha256":  "4e9f28d989a8f4c6f392fc7f20e9c33313b9d12e9564d3d873644ccf8a0851b8"
+                  },
+                  {
+                      "path":  "wrangler.toml",
+                      "sha256":  "cec618a58f748344bbfd1e6c21f050966e7b04a6cd5ad4f2d8789ba2bf1e1cfd"
+                  },
+                  {
+                      "path":  "package.json",
+                      "sha256":  "75ba80cca6312fc00d9667445933a3b312e121710a8f1c3ba5d899f61020ec1d"
+                  },
+                  {
+                      "path":  "schema.sql",
+                      "sha256":  "24c73e8df195f555fdcf009bd2143dc7caba4fe6f5663d8530c4e565e77f3537"
+                  },
+                  {
+                      "path":  "src/responses.js",
+                      "sha256":  "3f81286b6a6357365709b87d43dd872f5d436c211b297fecf543680cbe7e5748"
+                  },
+                  {
+                      "path":  "src/state.js",
+                      "sha256":  "88f264eb2dbbbe2b2ecfca65d167d2021b026ea306e7bd7499100ff2f6e1491f"
+                  },
+                  {
+                      "path":  "src/safety.js",
+                      "sha256":  "aded5583d01a08399ef6e6c50f6ef2fbfd1bfbcf885d1988523b4c92181f5422"
+                  },
+                  {
+                      "path":  "src/contracts.js",
+                      "sha256":  "df2031996e1e81538e259c329281baa8b6f33cc1348bb55a7402a62cd476874a"
+                  },
+                  {
+                      "path":  "src/parts.js",
+                      "sha256":  "9538d976dd3f8d4c072578d12cd5ed22a1b693f4b5db144b0b9d49608d74e91b"
+                  },
+                  {
+                      "path":  "src/chainState.js",
+                      "sha256":  "40e75584148f9a34ac1e44edbd87a771dc506f82057ea6d47492f71dd52e1325"
+                  }
+              ]
+}

@@ -587,6 +587,35 @@ function topicToAddress(topic) {
   return `0x${String(topic).slice(-40)}`.toLowerCase();
 }
 
+// ---- applied whole-machine EFFECT (from the token's on-chain garage) ----
+// The garage (ERC-6551 token-bound account) holds the ERC-1155 effect parts a holder wins from crates.
+// We report which effect the token has so the live animation can render it. Fail-closed to null: any RPC
+// issue / missing config just means "no effect" — the animation is byte-identical to today.
+const EFFECT_CRATES_ADDR = "0x50Dc22553988de047a00328963faEe8EC5E19b12"; // ScrapCrates (garageOf)
+const EFFECT_PARTS_ADDR = "0x3f6ADfe2fA714c28B2c6ec4762D089069675f2a2"; // ScrapParts (ERC-1155 balanceOf)
+const EFFECT_PART_IDS = [[1, "neon"], [2, "holo"], [3, "teal"]];
+const effUint = (n) => BigInt(n).toString(16).padStart(64, "0");
+const effAddr = (a) => String(a).replace(/^0x/, "").toLowerCase().padStart(64, "0");
+
+export async function readTokenEffect(env, tokenId) {
+  if (!env.ETH_RPC_URL) return null;
+  try {
+    // garageOf(uint256)=0x3500754c → the token's garage address
+    const garageRes = await rpc(env, "eth_call", [{ to: EFFECT_CRATES_ADDR, data: "0x3500754c" + effUint(tokenId) }, "latest"]);
+    const garage = "0x" + String(garageRes || "").slice(-40);
+    if (!garage || /^0*$/.test(garage.replace(/^0x/, ""))) return null;
+    // balanceOf(address,uint256)=0x00fdd58e for each effect part; first owned wins
+    for (const [pid, key] of EFFECT_PART_IDS) {
+      const balRes = await rpc(env, "eth_call", [{ to: EFFECT_PARTS_ADDR, data: "0x00fdd58e" + effAddr(garage) + effUint(pid) }, "latest"]);
+      if (BigInt(balRes || "0x0") > 0n) return key;
+    }
+    return null;
+  } catch (error) {
+    console.warn("readTokenEffect failed (returning null):", error?.message || error);
+    return null;
+  }
+}
+
 function hexToNumber(hex) {
   return Number(BigInt(hex || "0x0"));
 }
