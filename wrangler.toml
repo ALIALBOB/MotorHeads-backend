@@ -5,6 +5,9 @@ compatibility_date = "2026-06-08"
 [vars]
 CORS_ORIGIN = "*"
 ALLOW_UNVERIFIED_WRITES = "false"
+# Opt-in equip is LIVE: the animation shows only what a holder has equipped on MotorHeadsEquip (0 = none).
+# Grandfathered tokens (#1/#20/#124) were seeded on-chain first. Set to "false" + redeploy to instantly revert to first-owned.
+EQUIP_READS = "true"
 MOTORHEADS_DEPLOY_BLOCK = "25261729"
 INDEXER_CONFIRMATIONS = "6"
 INDEXER_MAX_BLOCK_RANGE = "1000"

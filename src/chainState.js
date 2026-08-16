@@ -593,27 +593,176 @@ function topicToAddress(topic) {
 // issue / missing config just means "no effect" — the animation is byte-identical to today.
 const EFFECT_CRATES_ADDR = "0x50Dc22553988de047a00328963faEe8EC5E19b12"; // ScrapCrates (garageOf)
 const EFFECT_PARTS_ADDR = "0x3f6ADfe2fA714c28B2c6ec4762D089069675f2a2"; // ScrapParts (ERC-1155 balanceOf)
-const EFFECT_PART_IDS = [[1, "neon"], [2, "holo"], [3, "teal"]];
+// premium WebGL effects (partIds 4-12) listed FIRST so a token owning one shows it over a legacy 2D effect (1-3).
+const EFFECT_PART_IDS = [
+  [4, "living"], [5, "molten"], [6, "gold"], [7, "plasma"], [8, "crystal"], [9, "aurora"], [10, "mercury"], [11, "toxic"], [12, "hologram"],
+  [1, "neon"], [2, "holo"], [3, "teal"],
+];
 const effUint = (n) => BigInt(n).toString(16).padStart(64, "0");
 const effAddr = (a) => String(a).replace(/^0x/, "").toLowerCase().padStart(64, "0");
+
+// Animated backgrounds occupy partIds 13-24 — a SEPARATE garage slot from effects (a token can hold one of each).
+const BG_PART_IDS = [
+  [13, "nebula"], [14, "blackhole"], [15, "waterfall"], [16, "leaves"], [17, "wolf"], [18, "moon"],
+  [19, "aurora"], [20, "rain"], [21, "butterflies"], [22, "flowers"], [23, "confetti"], [24, "rainbow"],
+];
+
+async function readGarage(env, tokenId) {
+  const garageRes = await rpc(env, "eth_call", [{ to: EFFECT_CRATES_ADDR, data: "0x3500754c" + effUint(tokenId) }, "latest"]); // garageOf(uint256)
+  const garage = "0x" + String(garageRes || "").slice(-40);
+  return (!garage || /^0*$/.test(garage.replace(/^0x/, ""))) ? null : garage;
+}
+
+// balanceOfBatch(address[],uint256[])=0x4e1273f4 — ONE call for the whole part list; first owned (list order) wins.
+async function readFirstOwnedKey(env, garage, partList) {
+  const n = partList.length;
+  const offsets = effUint(0x40) + effUint(0x40 + 32 + 32 * n); // dyn-array offsets: accounts[] then ids[]
+  const acctArr = effUint(n) + partList.map(() => effAddr(garage)).join("");
+  const idsArr = effUint(n) + partList.map(([pid]) => effUint(pid)).join("");
+  const balRes = await rpc(env, "eth_call", [{ to: EFFECT_PARTS_ADDR, data: "0x4e1273f4" + offsets + acctArr + idsArr }, "latest"]);
+  const hex = String(balRes || "").replace(/^0x/, "");
+  for (let i = 0; i < n; i++) {
+    const word = hex.slice((2 + i) * 64, (3 + i) * 64) || "0"; // skip the offset + length words
+    if (BigInt("0x" + word) > 0n) return partList[i][1];
+  }
+  return null;
+}
+
+// ---- on-chain EQUIP (opt-in): the holder pays a fee to CHOOSE which owned effect/bg shows (MotorHeadsEquip) ----
+// When EQUIP_READS === "true" the animation shows ONLY what the holder explicitly equipped (equippedId 0 = none),
+// NOT whatever they happen to own. equippedEffect/Background == 0 means "none" whether never-set (opt-in default)
+// or explicitly unequipped — so no extra flag is needed. Existing owners are seeded once via grandfather() so their
+// current effect doesn't vanish when this flips on. Flip the switch (set EQUIP_READS) only AFTER grandfather runs.
+const EQUIP_ADDR = "0xF16E4CD4a69763106D01AbFF2234e65235681A8A";
+const SEL_EQUIPPED_OF = "0x076ce9c1"; // equippedOf(uint256) -> (effectId, backgroundId)
+const CRATE_OPENED_TOPIC = "0x4c7db30c9ea815193c7b81c81b90212975e0a72ab83f9cb8be9d3940b9322320"; // CrateOpened(uint256,uint256,address,uint256,uint256)
+const idToEffectKey = new Map(EFFECT_PART_IDS.map(([id, key]) => [id, key]));
+const idToBgKey = new Map(BG_PART_IDS.map(([id, key]) => [id, key]));
+
+async function readEquippedIds(env, tokenId) {
+  const res = await rpc(env, "eth_call", [{ to: EQUIP_ADDR, data: SEL_EQUIPPED_OF + effUint(tokenId) }, "latest"]);
+  const hex = String(res || "").replace(/^0x/, "");
+  const effectId = Number(BigInt("0x" + (hex.slice(0, 64) || "0")));
+  const backgroundId = Number(BigInt("0x" + (hex.slice(64, 128) || "0")));
+  return { effectId, backgroundId };
+}
 
 export async function readTokenEffect(env, tokenId) {
   if (!env.ETH_RPC_URL) return null;
   try {
-    // garageOf(uint256)=0x3500754c → the token's garage address
-    const garageRes = await rpc(env, "eth_call", [{ to: EFFECT_CRATES_ADDR, data: "0x3500754c" + effUint(tokenId) }, "latest"]);
-    const garage = "0x" + String(garageRes || "").slice(-40);
-    if (!garage || /^0*$/.test(garage.replace(/^0x/, ""))) return null;
-    // balanceOf(address,uint256)=0x00fdd58e for each effect part; first owned wins
-    for (const [pid, key] of EFFECT_PART_IDS) {
-      const balRes = await rpc(env, "eth_call", [{ to: EFFECT_PARTS_ADDR, data: "0x00fdd58e" + effAddr(garage) + effUint(pid) }, "latest"]);
-      if (BigInt(balRes || "0x0") > 0n) return key;
+    if (env.EQUIP_READS === "true") {
+      const { effectId } = await readEquippedIds(env, tokenId);
+      return idToEffectKey.get(effectId) || null; // only the explicitly-equipped effect (0 -> none)
     }
-    return null;
-  } catch (error) {
-    console.warn("readTokenEffect failed (returning null):", error?.message || error);
-    return null;
+    const g = await readGarage(env, tokenId);
+    return g ? await readFirstOwnedKey(env, g, EFFECT_PART_IDS) : null; // legacy: first-owned
   }
+  catch (error) { console.warn("readTokenEffect failed (returning null):", error?.message || error); return null; }
+}
+
+export async function readTokenBackground(env, tokenId) {
+  if (!env.ETH_RPC_URL) return null;
+  try {
+    if (env.EQUIP_READS === "true") {
+      const { backgroundId } = await readEquippedIds(env, tokenId);
+      return idToBgKey.get(backgroundId) || null;
+    }
+    const g = await readGarage(env, tokenId);
+    return g ? await readFirstOwnedKey(env, g, BG_PART_IDS) : null;
+  }
+  catch (error) { console.warn("readTokenBackground failed (returning null):", error?.message || error); return null; }
+}
+
+// balanceOfBatch → ALL keys the garage owns from partList (not just the first). One RPC call.
+async function readAllOwnedKeys(env, garage, partList) {
+  const n = partList.length;
+  const offsets = effUint(0x40) + effUint(0x40 + 32 + 32 * n);
+  const acctArr = effUint(n) + partList.map(() => effAddr(garage)).join("");
+  const idsArr = effUint(n) + partList.map(([pid]) => effUint(pid)).join("");
+  const balRes = await rpc(env, "eth_call", [{ to: EFFECT_PARTS_ADDR, data: "0x4e1273f4" + offsets + acctArr + idsArr }, "latest"]);
+  const hex = String(balRes || "").replace(/^0x/, "");
+  const owned = [];
+  for (let i = 0; i < n; i++) {
+    const word = hex.slice((2 + i) * 64, (3 + i) * 64) || "0";
+    if (BigInt("0x" + word) > 0n) owned.push(partList[i][1]);
+  }
+  return owned;
+}
+
+// Which effect + background keys a token's garage OWNS (inventory) — a wallet-independent read for the site's
+// Effects tab (its own eth_call goes through the holder's wallet, which breaks if they're on the wrong network).
+export async function readTokenOwnedParts(env, tokenId) {
+  if (!env.ETH_RPC_URL) return { effects: [], backgrounds: [] };
+  try {
+    const g = await readGarage(env, tokenId);
+    if (!g) return { effects: [], backgrounds: [] };
+    const effects = await readAllOwnedKeys(env, g, EFFECT_PART_IDS);
+    const backgrounds = await readAllOwnedKeys(env, g, BG_PART_IDS);
+    return { effects, backgrounds };
+  } catch (error) { console.warn("readTokenOwnedParts failed:", error?.message || error); return { effects: [], backgrounds: [] }; }
+}
+
+// balanceOfBatch first-owned but returns the PART ID (0 = none) — for the grandfather snapshot.
+async function readFirstOwnedId(env, garage, partList) {
+  const n = partList.length;
+  const offsets = effUint(0x40) + effUint(0x40 + 32 + 32 * n);
+  const acctArr = effUint(n) + partList.map(() => effAddr(garage)).join("");
+  const idsArr = effUint(n) + partList.map(([pid]) => effUint(pid)).join("");
+  const balRes = await rpc(env, "eth_call", [{ to: EFFECT_PARTS_ADDR, data: "0x4e1273f4" + offsets + acctArr + idsArr }, "latest"]);
+  const hex = String(balRes || "").replace(/^0x/, "");
+  for (let i = 0; i < n; i++) {
+    const word = hex.slice((2 + i) * 64, (3 + i) * 64) || "0";
+    if (BigInt("0x" + word) > 0n) return partList[i][0];
+  }
+  return 0;
+}
+
+// Accumulate ALL logs across [fromBlock, toBlock], halving the chunk on RPC range errors.
+async function getLogsRange(env, address, topics, fromBlock, toBlock) {
+  const out = [];
+  let from = fromBlock;
+  let chunk = 5000;
+  while (from <= toBlock) {
+    const to = Math.min(toBlock, from + chunk - 1);
+    try {
+      const logs = await rpc(env, "eth_getLogs", [{ address, topics, fromBlock: toQuantity(from), toBlock: toQuantity(to) }]);
+      out.push(...logs);
+      from = to + 1;
+      if (chunk < 5000) chunk = Math.min(5000, chunk * 2);
+    } catch (error) {
+      if (chunk === 1) throw error;
+      chunk = Math.max(1, Math.floor(chunk / 2));
+    }
+  }
+  return out;
+}
+
+// The one-time grandfather snapshot: every token that has EVER opened a crate, mapped to the effect + background
+// it CURRENTLY shows (first-owned — identical to the legacy read). The founder passes this to equip.grandfather()
+// so those NFTs keep their look when EQUIP_READS flips on. Public read (all inputs are on-chain events).
+export async function readEquipGrandfatherList(env) {
+  if (!env.ETH_RPC_URL) return { tokenIds: [], effectIds: [], backgroundIds: [], count: 0 };
+  const latest = Number(BigInt(await rpc(env, "eth_blockNumber", [])));
+  const fromBlock = Math.max(0, latest - 120000); // ~3 weeks, well before the 2026-08 crate launch
+  const logs = await getLogsRange(env, EFFECT_CRATES_ADDR, [CRATE_OPENED_TOPIC], fromBlock, latest);
+  const tokenSet = new Set();
+  for (const lg of logs) {
+    if (lg?.topics?.[1]) tokenSet.add(Number(BigInt(lg.topics[1]))); // machineTokenId is the first indexed arg
+  }
+  const tokenIds = [], effectIds = [], backgroundIds = [];
+  let skippedAlreadyEquipped = 0;
+  for (const tid of [...tokenSet].sort((a, b) => a - b)) {
+    // Skip any token that already has an equip state (revision > 0) — grandfathered or holder-equipped — so a
+    // RE-RUN (to sweep late crate-openers) never overwrites a holder's paid choice back to first-owned.
+    const revRes = await rpc(env, "eth_call", [{ to: EQUIP_ADDR, data: "0x9418fe56" + effUint(tid) }, "latest"]); // equipRevision(uint256)
+    if (BigInt(revRes || "0x0") > 0n) { skippedAlreadyEquipped++; continue; }
+    const g = await readGarage(env, tid);
+    if (!g) continue;
+    const eid = await readFirstOwnedId(env, g, EFFECT_PART_IDS);
+    const bid = await readFirstOwnedId(env, g, BG_PART_IDS);
+    if (eid || bid) { tokenIds.push(tid); effectIds.push(eid); backgroundIds.push(bid); }
+  }
+  return { tokenIds, effectIds, backgroundIds, count: tokenIds.length, scannedOpens: logs.length, skippedAlreadyEquipped };
 }
 
 function hexToNumber(hex) {

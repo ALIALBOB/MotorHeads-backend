@@ -1,7 +1,8 @@
 import { COLLECTION, CIDS, NETWORK } from "./contracts.js";
 import { PART_LIBRARY } from "./parts.js";
-import { readChainSummary, readTokenChainState, readTokenEffect, syncChainState } from "./chainState.js";
+import { readChainSummary, readTokenChainState, readTokenEffect, readTokenBackground, readEquipGrandfatherList, readTokenOwnedParts, syncChainState } from "./chainState.js";
 import { routeCustomizationRequest } from "./customization/routes.js";
+import { routeShareRequest } from "./share.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
 import { recordHit, readStats } from "./stats.js";
 import { handleCrateSign } from "./crate-signer.js";
@@ -26,6 +27,11 @@ export default {
     const customizationResponse = await routeCustomizationRequest(request, env, ctx);
     if (customizationResponse) {
       return customizationResponse;
+    }
+
+    const shareResponse = await routeShareRequest(request, env, ctx);
+    if (shareResponse) {
+      return shareResponse;
     }
 
     if (request.method === "OPTIONS") {
@@ -92,6 +98,16 @@ async function route(request, env) {
     return json({ ok: true, chain: await readChainSummary(env) }, {}, env);
   }
 
+  // One-time equip grandfather snapshot: which tokens currently show an effect/background (first-owned),
+  // so the founder can seed equip.grandfather() before flipping EQUIP_READS. Public — all inputs are on-chain.
+  if (request.method === "GET" && pathname === "/v1/equip/grandfather-list") {
+    try {
+      return json({ ok: true, ...(await readEquipGrandfatherList(env)) }, {}, env);
+    } catch (error) {
+      return errorJson(500, "grandfather_scan_failed", error?.message || "Grandfather scan failed.", undefined, env);
+    }
+  }
+
   if (request.method === "POST" && pathname === "/v1/indexer/run") {
     return handleIndexerRun(request, env);
   }
@@ -117,6 +133,14 @@ async function route(request, env) {
   const tokenChainStateMatch = pathname.match(/^\/v1\/tokens\/([^/]+)\/chain-state$/);
   if (tokenChainStateMatch) {
     return handleTokenChainState(request, env, tokenChainStateMatch[1]);
+  }
+
+  // Which effect/background parts a token's garage owns (inventory) — wallet-independent read for the Effects tab.
+  const tokenOwnedMatch = pathname.match(/^\/v1\/tokens\/([^/]+)\/owned-parts$/);
+  if (tokenOwnedMatch && request.method === "GET") {
+    const tokenId = parseTokenId(tokenOwnedMatch[1]);
+    if (!tokenId) return errorJson(400, "invalid_token_id", "Token ID must be between 1 and 5555.", undefined, env);
+    return json({ ok: true, ...(await readTokenOwnedParts(env, tokenId)) }, {}, env);
   }
 
   const agentMatch = pathname.match(/^\/v1\/agent\/([^/]+)$/);
@@ -273,6 +297,7 @@ async function handleTokenChainState(request, env, rawTokenId) {
 
   const chainState = await readTokenChainState(env, tokenId);
   chainState.effect = await readTokenEffect(env, tokenId); // applied whole-machine effect (null if none) — drives the live animation FX
+  chainState.background = await readTokenBackground(env, tokenId); // applied animated background (null if none) — drives the anim's behind layer
   return json({ ok: true, chainState }, {}, env);
 }
 

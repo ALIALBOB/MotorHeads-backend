@@ -5,9 +5,12 @@
 //   • On-chain edits: read live from the MotorHeadsParts companion via ETH_RPC_URL
 //     (the same Alchemy secret the indexer uses) — edits are on-chain, so this is truth.
 import { json, errorJson } from "./responses.js";
-import { recoverMessageAddress, getAddress } from "viem";
+import { recoverMessageAddress, getAddress, keccak256, toBytes } from "viem";
 
 const PARTS_CONTRACT = "0xed26E94663FA23CFb952771111770474c4F1f082"; // mainnet MotorHeadsParts companion
+const CRATES_CONTRACT = "0x50Dc22553988de047a00328963faEe8EC5E19b12"; // ScrapCrates (garage activation + crate mint)
+const ACTIVATED_TOPIC = keccak256(toBytes("Activated(uint256,address,uint256)")); // count activated garages
+const TOTAL_MINTED_SEL = "0xa2309ff8"; // totalMinted() on the crates 1155
 // Admin wallet allowed to view the dashboard. Defaults to the companion's treasury; override with env.ADMIN_ADDRESS.
 const ADMIN_DEFAULT = "0x95A6fB3087b3469Ed777120052E0ac3f262c81C1";
 function adminAddress(env) { try { return getAddress(env.ADMIN_ADDRESS || ADMIN_DEFAULT).toLowerCase(); } catch { return ADMIN_DEFAULT.toLowerCase(); } }
@@ -95,6 +98,24 @@ async function readEdits(env) {
   };
 }
 
+// Garage/crate activity: how many machines have activated their garage + total crates minted + the
+// activation-fee balance sitting on the crates contract. Counts the Activated event via getLogs (cheap —
+// the crates contract is only a few days old). Best-effort; never blocks the dashboard.
+async function readGarageStats(env) {
+  if (!env.ETH_RPC_URL) return { source: "no_rpc" };
+  const latest = parseInt(await rpc(env, "eth_blockNumber"), 16);
+  const from = Math.max(0, latest - HIT_RANGE_BLOCKS);
+  const logs = await rpc(env, "eth_getLogs", [{ address: CRATES_CONTRACT, topics: [ACTIVATED_TOPIC], fromBlock: "0x" + from.toString(16), toBlock: "latest" }]);
+  const machines = new Set();
+  for (const l of (logs || [])) {
+    if (l.topics && l.topics[1]) { try { const id = BigInt(l.topics[1]); if (id >= 1n && id <= 5555n) machines.add(id.toString()); } catch {} }
+  }
+  let cratesMinted = null;
+  try { cratesMinted = Number(BigInt(await rpc(env, "eth_call", [{ to: CRATES_CONTRACT, data: TOTAL_MINTED_SEL }, "latest"]))); } catch {}
+  const bal = await rpc(env, "eth_getBalance", [CRATES_CONTRACT, "latest"]);
+  return { source: "chain", activatedMachines: machines.size, activations: (logs || []).length, cratesMinted, activationFeesEth: (Number(BigInt(bal)) / 1e18).toFixed(5) };
+}
+
 export async function readStats(request, env) {
   // Gate: admin wallet signature (primary) OR the optional STATS_KEY (fallback for tooling).
   const url = new URL(request.url);
@@ -118,8 +139,10 @@ export async function readStats(request, env) {
       visitors = { total: t?.c || 0, uniques: t?.u || 0, views7: w?.c || 0, uniques7: w?.u || 0, viewsToday: td?.c || 0, daily: (daily?.results || []).map((r) => ({ date: r.d, views: r.c, uniques: r.u })), source: "db" };
     } catch (e) { visitors.error = String(e.message || e).slice(0, 140); }
   }
-  let edits = { source: "unavailable" };
-  try { edits = await readEdits(env); } catch (e) { edits = { source: "error", error: String(e.message || e).slice(0, 140), feesEth: null, tokensEdited: 0, saveEvents: 0 }; }
+  const [edits, garage] = await Promise.all([
+    readEdits(env).catch((e) => ({ source: "error", error: String(e.message || e).slice(0, 140), feesEth: null, tokensEdited: 0, saveEvents: 0 })),
+    readGarageStats(env).catch((e) => ({ source: "error", error: String(e.message || e).slice(0, 140) })),
+  ]);
 
-  return json({ ok: true, visitors, edits, generatedAt: new Date().toISOString() }, {}, env);
+  return json({ ok: true, visitors, edits, garage, generatedAt: new Date().toISOString() }, {}, env);
 }
