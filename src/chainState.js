@@ -636,7 +636,7 @@ async function readFirstOwnedKey(env, garage, partList) {
 // NOT whatever they happen to own. equippedEffect/Background == 0 means "none" whether never-set (opt-in default)
 // or explicitly unequipped — so no extra flag is needed. Existing owners are seeded once via grandfather() so their
 // current effect doesn't vanish when this flips on. Flip the switch (set EQUIP_READS) only AFTER grandfather runs.
-const EQUIP_ADDR = "0xF16E4CD4a69763106D01AbFF2234e65235681A8A";
+const EQUIP_ADDR = "0x7A8885EcB480063fdDBa6799C8d42179930B68aE"; // MotorHeadsEquip v2 (settable ranges, bg 13-36); v1 was 0xF16E4CD4… (grandfathered #1/#20/#124/#2511 into v2)
 const SEL_EQUIPPED_OF = "0x076ce9c1"; // equippedOf(uint256) -> (effectId, backgroundId)
 const CRATE_OPENED_TOPIC = "0x4c7db30c9ea815193c7b81c81b90212975e0a72ab83f9cb8be9d3940b9322320"; // CrateOpened(uint256,uint256,address,uint256,uint256)
 const idToEffectKey = new Map(EFFECT_PART_IDS.map(([id, key]) => [id, key]));
