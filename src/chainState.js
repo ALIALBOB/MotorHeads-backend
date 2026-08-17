@@ -601,10 +601,13 @@ const EFFECT_PART_IDS = [
 const effUint = (n) => BigInt(n).toString(16).padStart(64, "0");
 const effAddr = (a) => String(a).replace(/^0x/, "").toLowerCase().padStart(64, "0");
 
-// Animated backgrounds occupy partIds 13-24 — a SEPARATE garage slot from effects (a token can hold one of each).
+// Animated backgrounds occupy partIds 13-36 — a SEPARATE garage slot from effects (a token can hold one of each).
+// Vol. 1 = 13-24; Vol. 2 = 25-36 (the "Backgrounds Vol. 2" crate). Must match webgl-bg BG_PART_KEYS + the site.
 const BG_PART_IDS = [
   [13, "nebula"], [14, "blackhole"], [15, "waterfall"], [16, "leaves"], [17, "wolf"], [18, "moon"],
   [19, "aurora"], [20, "rain"], [21, "butterflies"], [22, "flowers"], [23, "confetti"], [24, "rainbow"],
+  [25, "aquarium"], [26, "synthwave"], [27, "matrix"], [28, "koi"], [29, "lofirain"], [30, "jellyfish"],
+  [31, "warp"], [32, "fireflies"], [33, "sakura"], [34, "lavalamp"], [35, "snow"], [36, "neoncity"],
 ];
 
 async function readGarage(env, tokenId) {
