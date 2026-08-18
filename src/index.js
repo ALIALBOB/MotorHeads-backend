@@ -53,14 +53,13 @@ export default {
     }
 
     ctx.waitUntil(
-      syncChainState(env, { reason: event?.cron || "cron" })
-        // Self-healing: after each index, reclassify a small batch of past transfers that were actually sales
-        // (the old detector missed Seaport/WETH). Clears the backlog over a few cycles, then no-ops.
-        .then(() => backfillSales(env, 20).catch((e) => console.warn("sales backfill batch failed", e?.message)))
-        .catch((error) => {
-          console.error("MotorHeads chain indexer failed", error);
-        })
+      syncChainState(env, { reason: event?.cron || "cron" }).catch((error) => {
+        console.error("MotorHeads chain indexer failed", error);
+      })
     );
+    // NOTE: historical sale backfill is NOT run on the cron — with a 5000/day RPC budget, grinding the ~4k
+    // transfer backlog would starve the indexer. It's done out-of-band (local script on a free public RPC) +
+    // the gated /v1/indexer/backfill-sales endpoint for deliberate, throttled runs. Forward detection is live.
   }
 };
 

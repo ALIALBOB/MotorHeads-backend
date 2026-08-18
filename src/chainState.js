@@ -494,7 +494,7 @@ export async function backfillSales(env, limit = 30) {
   if (!env.ETH_RPC_URL) return { ok: false, error: "no RPC configured" };
   const now = new Date().toISOString();
   const rows = (await env.DB
-    .prepare("SELECT event_id, token_id, tx_hash, from_address FROM chain_event WHERE event_type='transfer' AND (payload_json IS NULL OR payload_json NOT LIKE '%\"saleChecked\"%') ORDER BY block_number ASC LIMIT ?")
+    .prepare("SELECT event_id, token_id, tx_hash, from_address FROM chain_event WHERE event_type='transfer' AND (payload_json IS NULL OR payload_json NOT LIKE '%\"saleChecked\"%') ORDER BY block_number DESC LIMIT ?")
     .bind(Math.max(1, Math.min(80, Number(limit) || 30)))
     .all()).results || [];
   const cache = new Map();
