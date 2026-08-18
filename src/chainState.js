@@ -1,8 +1,25 @@
+import { decodeEventLog } from "viem";
 import { COLLECTION } from "./contracts.js";
 import { guardIndexerRun, guardRpcCall } from "./safety.js";
 
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+// Marketplace sale detection: modern Seaport sales don't expose the price as the tx's native `value` (it flows
+// through Seaport's settlement), so `tx.value > 0` misses most sales. We instead read the price from the
+// Seaport `OrderFulfilled` event's consideration (native ETH + WETH), matched to THIS tokenId. Fallbacks:
+// WETH transferred to the seller (other marketplaces), then native tx value (plain ETH buys).
+const SEAPORT_ORDER_FULFILLED_TOPIC = "0x9d9af8e38d66c62e2c12f0225249fd9d721c54b83f48d9352c97c6cacdcb6f31";
+const WETH_ADDR = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+const ORDER_FULFILLED_ABI = [{
+  type: "event", name: "OrderFulfilled", inputs: [
+    { name: "orderHash", type: "bytes32", indexed: false },
+    { name: "offerer", type: "address", indexed: true },
+    { name: "zone", type: "address", indexed: true },
+    { name: "recipient", type: "address", indexed: false },
+    { name: "offer", type: "tuple[]", indexed: false, components: [{ name: "itemType", type: "uint8" }, { name: "token", type: "address" }, { name: "identifier", type: "uint256" }, { name: "amount", type: "uint256" }] },
+    { name: "consideration", type: "tuple[]", indexed: false, components: [{ name: "itemType", type: "uint8" }, { name: "token", type: "address" }, { name: "identifier", type: "uint256" }, { name: "amount", type: "uint256" }, { name: "recipient", type: "address" }] },
+  ],
+}];
 const SECONDS_PER_BLOCK = 12;
 const SECONDS_PER_DAY = 86400;
 const DEFAULT_MAX_BLOCK_RANGE = 100;
@@ -344,10 +361,9 @@ async function applyTransferLog(env, log, txTransferCounts, txValueCache) {
   const now = new Date().toISOString();
   const isMint = log.from === ZERO_ADDRESS;
   const eventId = `${log.transactionHash}:${log.logIndex}`;
-  const transferCountForTx = txTransferCounts.get(log.transactionHash) || 1;
-  const txValueWei = isMint ? 0n : await readTransactionValue(env, log.transactionHash, txValueCache);
-  const saleDetected = !isMint && txValueWei > 0n;
-  const salePriceWei = saleDetected ? (txValueWei / BigInt(transferCountForTx)).toString() : null;
+  const saleInfo = isMint ? { isSale: false, priceWei: 0n } : await readSaleInfo(env, log.transactionHash, log.tokenId, log.from, txValueCache);
+  const saleDetected = saleInfo.isSale;
+  const salePriceWei = saleDetected ? saleInfo.priceWei.toString() : null;
 
   const insert = await env.DB
     .prepare(
@@ -363,7 +379,7 @@ async function applyTransferLog(env, log, txTransferCounts, txValueCache) {
       log.transactionHash,
       log.from,
       log.to,
-      JSON.stringify({ logIndex: log.logIndex, nativeValueWei: txValueWei.toString(), salePriceWei }),
+      JSON.stringify({ logIndex: log.logIndex, salePriceWei }),
       now
     )
     .run();
@@ -421,6 +437,93 @@ async function readTransactionValue(env, txHash, cache) {
   const value = BigInt(tx?.value || "0x0");
   cache.set(txHash, value);
   return value;
+}
+
+// Determine whether a transfer of `tokenId` was a SALE and at what price, by inspecting the tx receipt.
+// Priority: Seaport OrderFulfilled (matched to this token) → WETH paid to the seller → native tx value.
+// Returns { isSale, priceWei: BigInt }. Fail-safe: any RPC/parse issue → falls through, never throws.
+async function readSaleInfo(env, txHash, tokenId, sellerAddr, cache) {
+  const cacheKey = `sale:${txHash}:${tokenId}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+  let info = { isSale: false, priceWei: 0n };
+  const collLower = String(COLLECTION.contractAddress || "").toLowerCase();
+  const tid = (() => { try { return BigInt(tokenId); } catch { return null; } })();
+  try {
+    const receipt = await rpc(env, "eth_getTransactionReceipt", [txHash]);
+    const logs = receipt?.logs || [];
+    // 1) Seaport OrderFulfilled for THIS token — price = larger of the native/WETH money on either side
+    let best = 0n;
+    for (const log of logs) {
+      if (String(log.topics?.[0] || "").toLowerCase() !== SEAPORT_ORDER_FULFILLED_TOPIC) continue;
+      let decoded;
+      try { decoded = decodeEventLog({ abi: ORDER_FULFILLED_ABI, data: log.data, topics: log.topics }); } catch { continue; }
+      const offer = decoded.args?.offer || [], consid = decoded.args?.consideration || [];
+      const involves = tid !== null && [...offer, ...consid].some((it) => Number(it.itemType) >= 2 && String(it.token).toLowerCase() === collLower && BigInt(it.identifier) === tid);
+      if (!involves) continue;
+      const money = (arr) => arr.reduce((s, it) => { const t = Number(it.itemType); return (t === 0 || (t === 1 && String(it.token).toLowerCase() === WETH_ADDR)) ? s + BigInt(it.amount) : s; }, 0n);
+      const price = money(offer) > money(consid) ? money(offer) : money(consid);
+      if (price > best) best = price;
+    }
+    if (best > 0n) info = { isSale: true, priceWei: best };
+    // 2) fallback — WETH transferred TO the seller (non-Seaport marketplaces)
+    if (!info.isSale && sellerAddr && sellerAddr !== ZERO_ADDRESS) {
+      const sellerTopic = `0x${String(sellerAddr).toLowerCase().replace(/^0x/, "").padStart(64, "0")}`;
+      let weth = 0n;
+      for (const log of logs) {
+        if (String(log.address).toLowerCase() !== WETH_ADDR) continue;
+        if (String(log.topics?.[0] || "").toLowerCase() !== TRANSFER_TOPIC) continue;
+        if (String(log.topics?.[2] || "").toLowerCase() !== sellerTopic) continue;
+        try { weth += BigInt(log.data); } catch { /* ignore */ }
+      }
+      if (weth > 0n) info = { isSale: true, priceWei: weth };
+    }
+  } catch { /* receipt fetch failed — fall through to native value */ }
+  // 3) fallback — native ETH sent in the tx (plain "buy now" purchases)
+  if (!info.isSale) {
+    try { const val = await readTransactionValue(env, txHash, cache); if (val > 0n) info = { isSale: true, priceWei: val }; } catch { /* ignore */ }
+  }
+  cache.set(cacheKey, info);
+  return info;
+}
+
+// One-time (re-runnable) repair: transfers already stored as plain "transfer" that were actually SALES (the
+// old detector only saw native tx.value). Re-checks each with readSaleInfo; reclassifies real sales and
+// recomputes the token's sale_count + last-sale. Non-sales get a `saleChecked` flag so re-runs skip them.
+// Bounded per call (receipt fetch each) — call repeatedly until `remaining` reaches 0.
+export async function backfillSales(env, limit = 30) {
+  if (!env.ETH_RPC_URL) return { ok: false, error: "no RPC configured" };
+  const now = new Date().toISOString();
+  const rows = (await env.DB
+    .prepare("SELECT event_id, token_id, tx_hash, from_address FROM chain_event WHERE event_type='transfer' AND (payload_json IS NULL OR payload_json NOT LIKE '%\"saleChecked\"%') ORDER BY block_number ASC LIMIT ?")
+    .bind(Math.max(1, Math.min(80, Number(limit) || 30)))
+    .all()).results || [];
+  const cache = new Map();
+  const affected = new Set();
+  let checked = 0, reclassified = 0;
+  for (const row of rows) {
+    checked++;
+    let info;
+    try { info = await readSaleInfo(env, row.tx_hash, row.token_id, row.from_address, cache); }
+    catch { continue; }
+    if (info.isSale) {
+      await env.DB.prepare("UPDATE chain_event SET event_type='sale', payload_json=? WHERE event_id=?")
+        .bind(JSON.stringify({ salePriceWei: info.priceWei.toString(), backfilled: true }), row.event_id).run();
+      reclassified++;
+      affected.add(row.token_id);
+    } else {
+      await env.DB.prepare("UPDATE chain_event SET payload_json=? WHERE event_id=?")
+        .bind(JSON.stringify({ saleChecked: true }), row.event_id).run();
+    }
+  }
+  for (const tid of affected) {
+    const sales = (await env.DB.prepare("SELECT block_number, payload_json FROM chain_event WHERE token_id=? AND event_type='sale' ORDER BY block_number ASC").bind(tid).all()).results || [];
+    const latest = sales[sales.length - 1];
+    let lastPrice = null; try { lastPrice = JSON.parse(latest?.payload_json || "{}").salePriceWei ?? null; } catch { /* ignore */ }
+    await env.DB.prepare("UPDATE token_chain_state SET sale_count=?, last_sale_block=?, last_sale_price_wei=COALESCE(?, last_sale_price_wei), updated_at=? WHERE token_id=?")
+      .bind(sales.length, latest?.block_number ?? null, lastPrice, now, tid).run();
+  }
+  const remaining = (await env.DB.prepare("SELECT COUNT(*) AS c FROM chain_event WHERE event_type='transfer' AND (payload_json IS NULL OR payload_json NOT LIKE '%\"saleChecked\"%')").first())?.c ?? 0;
+  return { ok: true, checked, reclassified, tokensUpdated: affected.size, remaining };
 }
 
 async function writeChainMetrics(env, latestBlock, gasWei) {

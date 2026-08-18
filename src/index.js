@@ -1,6 +1,6 @@
 import { COLLECTION, CIDS, NETWORK } from "./contracts.js";
 import { PART_LIBRARY } from "./parts.js";
-import { readChainSummary, readTokenChainState, readTokenEffect, readTokenBackground, readEquipGrandfatherList, readTokenOwnedParts, syncChainState } from "./chainState.js";
+import { readChainSummary, readTokenChainState, readTokenEffect, readTokenBackground, readEquipGrandfatherList, readTokenOwnedParts, syncChainState, backfillSales } from "./chainState.js";
 import { routeCustomizationRequest } from "./customization/routes.js";
 import { routeShareRequest } from "./share.js";
 import { corsHeaders, errorJson, json } from "./responses.js";
@@ -53,9 +53,13 @@ export default {
     }
 
     ctx.waitUntil(
-      syncChainState(env, { reason: event?.cron || "cron" }).catch((error) => {
-        console.error("MotorHeads chain indexer failed", error);
-      })
+      syncChainState(env, { reason: event?.cron || "cron" })
+        // Self-healing: after each index, reclassify a small batch of past transfers that were actually sales
+        // (the old detector missed Seaport/WETH). Clears the backlog over a few cycles, then no-ops.
+        .then(() => backfillSales(env, 20).catch((e) => console.warn("sales backfill batch failed", e?.message)))
+        .catch((error) => {
+          console.error("MotorHeads chain indexer failed", error);
+        })
     );
   }
 };
@@ -110,6 +114,11 @@ async function route(request, env) {
 
   if (request.method === "POST" && pathname === "/v1/indexer/run") {
     return handleIndexerRun(request, env);
+  }
+
+  // One-time repair: reclassify past transfers that were actually Seaport/WETH sales the old detector missed.
+  if (request.method === "POST" && pathname === "/v1/indexer/backfill-sales") {
+    return handleBackfillSales(request, env);
   }
 
   // Crate opening: holder commits on-chain (requestId), asks for the signed seed here, then submits resolveOpen.
@@ -327,6 +336,21 @@ async function handleIndexerRun(request, env) {
     return json({ ok: true, indexer: result }, {}, env);
   } catch (error) {
     return errorJson(500, "indexer_failed", error.message || "The chain indexer failed.", undefined, env);
+  }
+}
+
+async function handleBackfillSales(request, env) {
+  const expectedToken = String(env.INDEXER_ADMIN_TOKEN || "").trim();
+  if (!expectedToken) return errorJson(501, "indexer_admin_token_missing", "Backfill is locked until INDEXER_ADMIN_TOKEN is configured.", undefined, env);
+  if (String(request.headers.get("X-Indexer-Token") || "").trim() !== expectedToken) {
+    return errorJson(401, "indexer_admin_required", "Backfill requires X-Indexer-Token.", undefined, env);
+  }
+  const limit = Number(new URL(request.url).searchParams.get("limit")) || 30;
+  try {
+    const result = await backfillSales(env, limit);
+    return json({ ok: true, backfill: result }, {}, env);
+  } catch (error) {
+    return errorJson(500, "backfill_failed", error.message || "The sales backfill failed.", undefined, env);
   }
 }
 
