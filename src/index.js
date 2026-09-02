@@ -63,7 +63,7 @@ export default {
   }
 };
 
-async function route(request, env) {
+async function route(request, env, ctx = {}) {
   const url = new URL(request.url);
   const { pathname } = url;
 
@@ -97,27 +97,51 @@ async function route(request, env) {
     return json({ ok: true, parts: PART_LIBRARY }, {}, env);
   }
 
-  // IPFS PROXY — serve the 333-Archive animation (+ its relative assets) SAME-ORIGIN so it embeds in the Foundry app.
-  // No public gateway works for embedding: Filebase adds `default-src 'self'` that kills the animation's 343 inline
-  // scripts; dweb.link/ipfs.io throw Cloudflare "Just a moment…" challenges. We fetch from Filebase server-side (where
-  // it returns 200 fine), STRIP the restrictive CSP + X-Frame-Options, and re-serve it — so the iframe runs the scripts.
+  // IPFS PROXY — serve the 333-Archive animation (+ image, + any relative assets) SAME-ORIGIN so it embeds in the
+  // Foundry app. No public gateway embeds cleanly: Filebase adds `default-src 'self'` that kills the animation's 343
+  // inline scripts; dweb.link/ipfs.io throw Cloudflare "Just a moment…" challenges in a browser iframe. So we fetch
+  // server-side, STRIP the restrictive CSP + X-Frame-Options, and re-serve it.
+  //
+  // This is how OpenSea serves the same media: read the token's IPFS media ONCE, then cache it on your own CDN and
+  // serve every later view from there. IPFS content is IMMUTABLE (addressed by its CID), so we cache it HARD at our
+  // own edge (Cache API, 1-year immutable) — after the first view NO visitor touches a public gateway again. The old
+  // proxy re-fetched Filebase live on every view (cf-cache-status: DYNAMIC); one slow moment there showed the visitor
+  // a "Gateway time-out". We also RACE two independent gateways so a single slow/down gateway can't break the embed.
   if (request.method === "GET" && pathname.startsWith("/v1/ipfs/")) {
     const rest = pathname.slice("/v1/ipfs/".length);
     if (!/^[a-z0-9]+(?:\/[A-Za-z0-9._\-/%]*)?$/i.test(rest)) return new Response("bad ipfs path", { status: 400 });
+
+    const cache = caches.default;
+    const cacheKey = new Request(url.toString(), { method: "GET" });
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
+
+    const grab = (base) => fetch(base + "/ipfs/" + rest + url.search, {
+      headers: { Accept: "*/*" },
+      signal: AbortSignal.timeout(12000),
+      cf: { cacheTtl: 31536000, cacheEverything: true }
+    }).then((r) => (r.ok ? r : Promise.reject(new Error("gateway " + r.status))));
+
+    let upstream;
     try {
-      const upstream = await fetch("https://ipfs.filebase.io/ipfs/" + rest + url.search, {
-        headers: { Accept: "*/*" }, cf: { cacheTtl: 3600, cacheEverything: true }
-      });
-      const h = new Headers(upstream.headers);
-      h.delete("content-security-policy");
-      h.delete("content-security-policy-report-only");
-      h.delete("x-frame-options");
-      h.set("access-control-allow-origin", "*");
-      h.set("cache-control", "public, max-age=3600");
-      return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: h });
-    } catch (e) {
-      return new Response("ipfs proxy error", { status: 502 });
+      // Promise.any → whichever independent gateway answers first (both proven to serve real content server-side).
+      upstream = await Promise.any([
+        grab("https://ipfs.filebase.io"),
+        grab("https://ipfs.io")
+      ]);
+    } catch {
+      return new Response("ipfs upstream unavailable", { status: 502, headers: { "access-control-allow-origin": "*" } });
     }
+
+    const buf = await upstream.arrayBuffer();
+    const h = new Headers();
+    const ct = upstream.headers.get("content-type");
+    if (ct) h.set("content-type", ct);
+    h.set("access-control-allow-origin", "*");
+    h.set("cache-control", "public, max-age=31536000, immutable");   // CID content never changes → cache forever
+    const out = new Response(buf, { status: 200, headers: h });
+    ctx.waitUntil?.(cache.put(cacheKey, out.clone()));               // populate OUR edge in the background
+    return out;
   }
 
   if (request.method === "GET" && pathname === "/v1/chain/summary") {
