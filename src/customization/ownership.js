@@ -158,12 +158,15 @@ function sortedUnique(ids) {
   return Array.from(new Set(ids)).sort((a, b) => a - b);
 }
 
-// Serve 333-Archive IPFS content through Filebase's gateway (where it's pinned) — far more reliable than ipfs.io.
-// Rewrites ipfs:// AND any other IPFS gateway URL to Filebase.
+// Route 333-Archive IPFS content through OUR same-origin proxy (/api/v1/ipfs/...). No public gateway embeds cleanly
+// (Filebase's CSP kills the animation's inline scripts; dweb.link/ipfs.io throw Cloudflare challenges), so the proxy
+// fetches from Filebase server-side + strips the CSP. Returns a same-origin path the Foundry app can iframe directly.
 function ipfsToHttp(u) {
   u = String(u || "");
-  if (u.startsWith("ipfs://")) return "https://ipfs.filebase.io/ipfs/" + u.slice(7);
-  return u.replace(/^https?:\/\/[^/]+\/ipfs\//i, "https://ipfs.filebase.io/ipfs/");
+  let rest = "";
+  if (u.startsWith("ipfs://")) rest = u.slice(7);
+  else { const m = u.match(/\/ipfs\/(.+)$/i); if (m) rest = m[1]; else return u; }
+  return "/api/v1/ipfs/" + rest;
 }
 
 // The owner's NFTs of a contract WITH media (image + animation_url), via Alchemy's NFT API (withMetadata=true).

@@ -97,6 +97,29 @@ async function route(request, env) {
     return json({ ok: true, parts: PART_LIBRARY }, {}, env);
   }
 
+  // IPFS PROXY — serve the 333-Archive animation (+ its relative assets) SAME-ORIGIN so it embeds in the Foundry app.
+  // No public gateway works for embedding: Filebase adds `default-src 'self'` that kills the animation's 343 inline
+  // scripts; dweb.link/ipfs.io throw Cloudflare "Just a moment…" challenges. We fetch from Filebase server-side (where
+  // it returns 200 fine), STRIP the restrictive CSP + X-Frame-Options, and re-serve it — so the iframe runs the scripts.
+  if (request.method === "GET" && pathname.startsWith("/v1/ipfs/")) {
+    const rest = pathname.slice("/v1/ipfs/".length);
+    if (!/^[a-z0-9]+(?:\/[A-Za-z0-9._\-/%]*)?$/i.test(rest)) return new Response("bad ipfs path", { status: 400 });
+    try {
+      const upstream = await fetch("https://ipfs.filebase.io/ipfs/" + rest + url.search, {
+        headers: { Accept: "*/*" }, cf: { cacheTtl: 3600, cacheEverything: true }
+      });
+      const h = new Headers(upstream.headers);
+      h.delete("content-security-policy");
+      h.delete("content-security-policy-report-only");
+      h.delete("x-frame-options");
+      h.set("access-control-allow-origin", "*");
+      h.set("cache-control", "public, max-age=3600");
+      return new Response(upstream.body, { status: upstream.status, statusText: upstream.statusText, headers: h });
+    } catch (e) {
+      return new Response("ipfs proxy error", { status: 502 });
+    }
+  }
+
   if (request.method === "GET" && pathname === "/v1/chain/summary") {
     return json({ ok: true, chain: await readChainSummary(env) }, {}, env);
   }
