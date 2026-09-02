@@ -157,3 +157,41 @@ export async function readOwnedTokenIds(env, contractAddress, address, { max = 5
 function sortedUnique(ids) {
   return Array.from(new Set(ids)).sort((a, b) => a - b);
 }
+
+// Serve 333-Archive IPFS content through Filebase's gateway (where it's pinned) — far more reliable than ipfs.io.
+// Rewrites ipfs:// AND any other IPFS gateway URL to Filebase.
+function ipfsToHttp(u) {
+  u = String(u || "");
+  if (u.startsWith("ipfs://")) return "https://ipfs.filebase.io/ipfs/" + u.slice(7);
+  return u.replace(/^https?:\/\/[^/]+\/ipfs\//i, "https://ipfs.filebase.io/ipfs/");
+}
+
+// The owner's NFTs of a contract WITH media (image + animation_url), via Alchemy's NFT API (withMetadata=true).
+// Powers the Foundry app showing real 333-Archive art + animations. Returns [] on a non-Alchemy RPC.
+export async function readOwnedNftMedia(env, contractAddress, address, { max = 60 } = {}) {
+  const rpcUrl = String(env.ETH_RPC_URL || "").trim();
+  if (!/alchemy\.com\/v2\//i.test(rpcUrl)) return [];
+  const nftBase = rpcUrl.replace(/\/v2\//i, "/nft/v3/").split("?")[0].replace(/\/$/, "");
+  const out = [];
+  let pageKey = "";
+  try {
+    for (let page = 0; page < 3 && out.length < max; page += 1) {
+      const url = `${nftBase}/getNFTsForOwner?owner=${encodeURIComponent(address)}` +
+        `&contractAddresses[]=${encodeURIComponent(contractAddress)}&withMetadata=true&pageSize=50` +
+        (pageKey ? `&pageKey=${encodeURIComponent(pageKey)}` : "");
+      const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) });
+      if (!res.ok) break;
+      const data = await res.json();
+      for (const nft of (Array.isArray(data?.ownedNfts) ? data.ownedNfts : [])) {
+        const id = Number(nft?.tokenId);
+        if (!Number.isInteger(id) || id < 1) continue;
+        const image = nft?.image?.cachedUrl || nft?.image?.pngUrl || ipfsToHttp(nft?.image?.originalUrl) || "";
+        const animation = ipfsToHttp(nft?.raw?.metadata?.animation_url || nft?.animation?.cachedUrl || "");
+        out.push({ tokenId: id, name: nft?.name || nft?.raw?.metadata?.name || `#${id}`, image, animation });
+      }
+      pageKey = data?.pageKey || "";
+      if (!pageKey) break;
+    }
+  } catch { /* return what we have */ }
+  return out.sort((a, b) => a.tokenId - b.tokenId).slice(0, max);
+}

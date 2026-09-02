@@ -1,5 +1,5 @@
 import { getAddress, isAddress } from "viem";
-import { PARTNER_COLLECTIONS } from "../contracts.js";
+import { PARTNER_COLLECTIONS, ARCHIVE_333_CONTRACT } from "../contracts.js";
 import {
   CUSTOMIZATION_CONTRACT,
   CUSTOMIZATION_TOKEN_MAX,
@@ -21,7 +21,7 @@ import {
   requestEtagMatches
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
-import { readCurrentOwner, readOwnedTokenIds, readOwnerBalanceResilient } from "./ownership.js";
+import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanceResilient } from "./ownership.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -33,7 +33,7 @@ import {
 import { readCustomization, resetCustomization, saveCustomization } from "./storage.js";
 import { validateAndNormalizeState } from "./validation.js";
 
-const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings)$/;
+const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings|archive333)$/;
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
 
 // Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
@@ -119,6 +119,16 @@ async function authRoute(request, env, action) {
     const partners = Object.fromEntries(partnerEntries);
     return customizationJson(
       { authenticated: true, address: session.address, isHolder, balance, tokenIds, partners },
+      { request, env, methods: "GET,OPTIONS" }
+    );
+  }
+  if (action === "archive333" && request.method === "GET") {
+    // The owner's real 333-Archive NFTs (id + image + animation_url) so the Foundry app can show them.
+    const session = await requireSession(request, env);
+    let nfts = [];
+    try { nfts = await readOwnedNftMedia(env, ARCHIVE_333_CONTRACT, session.address, { max: 60 }); } catch { nfts = []; }
+    return customizationJson(
+      { authenticated: true, address: session.address, contract: ARCHIVE_333_CONTRACT, nfts },
       { request, env, methods: "GET,OPTIONS" }
     );
   }
