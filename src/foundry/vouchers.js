@@ -106,12 +106,22 @@ export async function signBurnVoucher(env, wallet, robotId, toTier) {
   return { fn: "activateWithBurn", owner: wallet, robotId: String(robotId), toTier, burnIds: burnIds.map(String), nonce, deadline: deadline.toString(), signature: sig };
 }
 
-// ── sign an ATTACH voucher: verify the wallet owns the 333 + it isn't already bound ──
-export async function signAttachVoucher(env, wallet, robotId, archiveId) {
-  const sel = "0x" + (await keccakSel("ownerOf(uint256)"));
+// ArchiveVault.depositorOf(uint256) on Ethereum → who has the 333 ESCROWED (locked so it can't be sold while attached)
+async function vaultDepositorOf(env, archiveId) {
+  if (!/^0x[0-9a-fA-F]{40}$/.test(String(env.ARCHIVE_VAULT_ADDRESS || ""))) throw new Error("ARCHIVE_VAULT_ADDRESS not configured");
+  const sel = "0x" + (await keccakSel("depositorOf(uint256)"));
   const data = sel + BigInt(archiveId).toString(16).padStart(64, "0");
-  const owner = "0x" + String(await rpc(ethBase(env), "eth_call", [{ to: ARCHIVE333, data }, "latest"])).slice(-40);
-  if (owner.toLowerCase() !== String(wallet).toLowerCase()) throw new Error("you don't own that 333");
+  const r = await rpc(ethBase(env), "eth_call", [{ to: env.ARCHIVE_VAULT_ADDRESS, data }, "latest"]);
+  return "0x" + String(r).slice(-40);
+}
+function vaultDomain(env) {
+  return { name: "MHArchiveVault", version: "1", chainId: 1, verifyingContract: env.ARCHIVE_VAULT_ADDRESS }; // Ethereum mainnet
+}
+
+// ── sign an ATTACH voucher: the 333 must be ESCROWED by this wallet (locked) + not already attached ──
+export async function signAttachVoucher(env, wallet, robotId, archiveId) {
+  const depositor = await vaultDepositorOf(env, archiveId);
+  if (depositor.toLowerCase() !== String(wallet).toLowerCase()) throw new Error("lock the 333 in the vault first (deposit it) — it can't be sold while attached");
   if ((await archiveBoundTo(env, archiveId)) !== 0n) throw new Error("that 333 is already attached to a robot");
 
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 1800);
@@ -122,4 +132,20 @@ export async function signAttachVoucher(env, wallet, robotId, archiveId) {
     { name: "nonce", type: "bytes32" }, { name: "deadline", type: "uint256" }] };
   const sig = await account(env).signTypedData({ domain: bridgeDomain(env), types, primaryType: "Attach", message });
   return { fn: "attachArchive", owner: wallet, robotId: String(robotId), archiveId: String(archiveId), nonce, deadline: deadline.toString(), signature: sig };
+}
+
+// ── sign a vault WITHDRAW voucher: only AFTER the 333 is detached on Robinhood (so a robot never earns for a 333 that left) ──
+export async function signWithdrawVoucher(env, wallet, archiveId) {
+  const depositor = await vaultDepositorOf(env, archiveId);
+  if (depositor.toLowerCase() !== String(wallet).toLowerCase()) throw new Error("you didn't deposit that 333");
+  if ((await archiveBoundTo(env, archiveId)) !== 0n) throw new Error("detach it from your robot on Robinhood first, then withdraw");
+
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 1800);
+  const nonce = randNonce();
+  const message = { depositor: wallet, archiveId: BigInt(archiveId), nonce, deadline };
+  const types = { Withdraw: [
+    { name: "depositor", type: "address" }, { name: "archiveId", type: "uint256" },
+    { name: "nonce", type: "bytes32" }, { name: "deadline", type: "uint256" }] };
+  const sig = await account(env).signTypedData({ domain: vaultDomain(env), types, primaryType: "Withdraw", message });
+  return { fn: "withdraw", archiveId: String(archiveId), nonce, deadline: deadline.toString(), signature: sig };
 }
