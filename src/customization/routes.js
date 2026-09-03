@@ -22,7 +22,7 @@ import {
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
 import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanceResilient } from "./ownership.js";
-import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher } from "../foundry/vouchers.js";
+import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher, readOwnedRobots } from "../foundry/vouchers.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -36,7 +36,7 @@ import { validateAndNormalizeState } from "./validation.js";
 
 const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings|archive333)$/;
 // Foundry cross-chain vouchers: the backend watches Ethereum for the SIWE-logged-in wallet + signs (nobody tells us anything).
-const FOUNDRY_ROUTE = /^\/v1\/foundry\/(burn-voucher|attach-voucher|withdraw-voucher)$/;
+const FOUNDRY_ROUTE = /^\/v1\/foundry\/(burn-voucher|attach-voucher|withdraw-voucher|robots)$/;
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
 
 // Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
@@ -226,10 +226,15 @@ async function writeRoute(request, env, ctx, identity) {
 
 // Foundry vouchers — session-gated. The wallet comes from the SIWE session; we verify the burn/333 on-chain + sign.
 async function foundryRoute(request, env, action) {
-  if (request.method === "OPTIONS") return customizationOptions(request, env, { methods: "POST,OPTIONS" });
-  if (request.method !== "POST") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use POST for foundry vouchers.");
+  if (request.method === "OPTIONS") return customizationOptions(request, env, { methods: "GET,POST,OPTIONS" });
   requireFeature(env, "CUSTOMIZATION_AUTH_ENABLED", "CUSTOMIZATION_AUTH_DISABLED", "Authentication is disabled.");
   const session = await requireSession(request, env);
+  if (action === "robots") {
+    if (request.method !== "GET") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET for /robots.");
+    try { return customizationJson({ ok: true, address: session.address, robots: await readOwnedRobots(env, session.address) }, { request, env, methods: "GET,OPTIONS" }); }
+    catch (error) { if (error instanceof ApiError) throw error; throw new ApiError(400, "FOUNDRY_ROBOTS_FAILED", error?.message || "Could not read robots."); }
+  }
+  if (request.method !== "POST") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use POST for foundry vouchers.");
   const body = await readJsonBody(request);
   try {
     let out;

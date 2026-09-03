@@ -9,6 +9,8 @@ ALLOW_UNVERIFIED_WRITES = "false"
 # ARCHIVE_VAULT_ADDRESS is filled once the vault deploys on Ethereum.
 FORGE_BRIDGE_ADDRESS = "0x4fce692b2D9489448977063814cCa3c5Fb058299"
 FOUNDRY_REG_ADDRESS = "0x1237337b75D238B426a308c4b1d43fD997aad88e"
+ARCHIVE_VAULT_ADDRESS = "0xDE28cee1D47Ad026d101426eAEB399F46137C81E"
+FOUNDRY_NFT = "0xee14596172332c4f3964540904d9676d650d8de3"
 ROBINHOOD_RPC = "https://rpc.mainnet.chain.robinhood.com"
 # Opt-in equip is LIVE: the animation shows only what a holder has equipped on MotorHeadsEquip (0 = none).
 # Grandfathered tokens (#1/#20/#124) were seeded on-chain first. Set to "false" + redeploy to instantly revert to first-owned.

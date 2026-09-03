@@ -82,6 +82,27 @@ async function currentTier(env, robotId) {
 import { toFunctionSelector } from "viem";
 async function keccakSel(sig) { return toFunctionSelector("function " + sig).slice(2); }
 
+// ── the robots this wallet ACTUALLY owns on Robinhood (so the app shows real robots, not demo ones) ──
+export async function readOwnedRobots(env, wallet) {
+  const NFT = env.FOUNDRY_NFT || "0xee14596172332c4f3964540904d9676d650d8de3";
+  const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+  const toTopic = "0x" + BigInt(wallet).toString(16).padStart(64, "0");
+  let logs = [];
+  try { logs = await rpc(rhBase(env), "eth_getLogs", [{ address: NFT, topics: [TRANSFER, null, toTopic], fromBlock: "0x0", toBlock: "latest" }]); } catch { logs = []; }
+  const ids = [...new Set((logs || []).map((l) => BigInt(l.topics[3]).toString()))];
+  const tierSel = "0x" + (await keccakSel("tierOf(uint256)"));
+  const out = [];
+  for (const id of ids) {
+    let owner = "";
+    try { owner = "0x" + String(await rpc(rhBase(env), "eth_call", [{ to: NFT, data: "0x6352211e" + BigInt(id).toString(16).padStart(64, "0") }, "latest"])).slice(-40); } catch { continue; }
+    if (owner.toLowerCase() !== String(wallet).toLowerCase()) continue; // transferred away since
+    let tier = 0;
+    try { tier = Number(BigInt(await rpc(rhBase(env), "eth_call", [{ to: env.FOUNDRY_REG_ADDRESS, data: tierSel + BigInt(id).toString(16).padStart(64, "0") }, "latest"]) || "0x0")); } catch { tier = 0; }
+    out.push({ tokenId: Number(id), tier });
+  }
+  return out.sort((a, b) => a.tokenId - b.tokenId);
+}
+
 // ── sign a BURN voucher: pick enough of the wallet's UNUSED burns to reach toTier ──
 export async function signBurnVoucher(env, wallet, robotId, toTier) {
   toTier = Number(toTier);
