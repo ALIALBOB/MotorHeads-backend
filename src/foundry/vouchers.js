@@ -36,6 +36,22 @@ async function rpc(url, method, params) {
   if (j.error) throw new Error(`rpc ${method}: ${j.error.message}`);
   return j.result;
 }
+// Retry a read with exponential backoff — the public Robinhood RPC RATE-LIMITS the Worker (HTTP 429), and a
+// dropped ownerOf/tierOf would silently hide a robot the wallet really owns. Extra patience on 429. Read-only, safe.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function rpcRead(url, method, params, tries = 5) {
+  let err;
+  for (let i = 0; i < tries; i++) {
+    try { return await rpc(url, method, params); }
+    catch (e) {
+      err = e;
+      if (i >= tries - 1) break;
+      const is429 = /\b429\b/.test(String(e?.message || ""));
+      await sleep(Math.min(1200, (is429 ? 300 : 150) * Math.pow(1.6, i))); // capped so the scan can't hang the request
+    }
+  }
+  throw err;
+}
 function ethBase(env) { const u = String(env.ETH_RPC_URL || "").trim(); if (!u) throw new Error("ETH_RPC_URL not set"); return u; }
 function rhBase(env) { return String(env.ROBINHOOD_RPC || ROBINHOOD_RPC_DEFAULT); }
 
@@ -82,25 +98,81 @@ async function currentTier(env, robotId) {
 import { toFunctionSelector } from "viem";
 async function keccakSel(sig) { return toFunctionSelector("function " + sig).slice(2); }
 
+// ── D1 cache of a wallet's robots (last KNOWN-GOOD roster) ──────────────────────────────────────────
+// The public Robinhood RPC rate-limits the Worker (HTTP 429) and randomly drops reads, so a live scan can come
+// back short or empty even when the wallet owns robots. That cache is what makes a transient 429 unable to wipe
+// someone's roster: an incomplete scan is merged over the last good result instead of replacing it.
+async function loadRobotsCache(env, w) {
+  try { const row = await env.DB.prepare("SELECT robots FROM foundry_robots_cache WHERE wallet = ?").bind(w).first();
+    if (row && row.robots) { const r = JSON.parse(row.robots); if (Array.isArray(r)) return r; } } catch { /* no DB / bad row */ }
+  return null;
+}
+async function saveRobotsCache(env, w, robots) {
+  try { await env.DB.prepare(
+      "INSERT INTO foundry_robots_cache (wallet, robots, updated_at) VALUES (?1, ?2, ?3) " +
+      "ON CONFLICT(wallet) DO UPDATE SET robots = ?2, updated_at = ?3"
+    ).bind(w, JSON.stringify(robots), Date.now()).run();
+  } catch { /* best-effort */ }
+}
+function unionRobots(fresh, cached) {
+  const m = new Map();
+  for (const r of (cached || [])) m.set(r.tokenId, r);
+  for (const r of (fresh || [])) m.set(r.tokenId, r); // fresh tier wins
+  return [...m.values()].sort((a, b) => a.tokenId - b.tokenId);
+}
+
 // ── the robots this wallet ACTUALLY owns on Robinhood (so the app shows real robots, not demo ones) ──
+// Scan ownerOf(1..totalSupply) with retries (NOT eth_getLogs — the public RPC returns it unreliably). Every
+// per-token read that fails after retries marks the scan INCOMPLETE, so we know not to trust an empty/short
+// result and fall back to the D1 cache instead. The collection is small (forged over time); past the cap we use
+// the log scan. NOTE (real launch): at scale replace with an indexer/multicall — see FOUNDRY_LAUNCH_RUNBOOK.
 export async function readOwnedRobots(env, wallet) {
   const NFT = env.FOUNDRY_NFT || "0xee14596172332c4f3964540904d9676d650d8de3";
-  const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-  const toTopic = "0x" + BigInt(wallet).toString(16).padStart(64, "0");
-  let logs = [];
-  try { logs = await rpc(rhBase(env), "eth_getLogs", [{ address: NFT, topics: [TRANSFER, null, toTopic], fromBlock: "0x0", toBlock: "latest" }]); } catch { logs = []; }
-  const ids = [...new Set((logs || []).map((l) => BigInt(l.topics[3]).toString()))];
+  const REG = env.FOUNDRY_REG_ADDRESS;
+  const w = String(wallet).toLowerCase();
+  const ownerSel = "0x6352211e"; // ownerOf(uint256)
   const tierSel = "0x" + (await keccakSel("tierOf(uint256)"));
+  const id32 = (id) => BigInt(id).toString(16).padStart(64, "0");
+  const rh = rhBase(env);
+  const SCAN_CAP = 4000;
+
+  let total = 0, complete = true;
+  try { total = Number(BigInt(await rpcRead(rh, "eth_call", [{ to: NFT, data: "0x18160ddd" }, "latest"]) || "0x0")); }
+  catch { total = 0; complete = false; }
+
   const out = [];
-  for (const id of ids) {
+  // In a 1..totalSupply scan every id exists, so an ownerOf failure is a RATE LIMIT (uncertain), not a revert —
+  // treat it as "scan incomplete" rather than "not owned".
+  const addOwned = async (id) => {
     let owner = "";
-    try { owner = "0x" + String(await rpc(rhBase(env), "eth_call", [{ to: NFT, data: "0x6352211e" + BigInt(id).toString(16).padStart(64, "0") }, "latest"])).slice(-40); } catch { continue; }
-    if (owner.toLowerCase() !== String(wallet).toLowerCase()) continue; // transferred away since
+    try { owner = "0x" + String(await rpcRead(rh, "eth_call", [{ to: NFT, data: ownerSel + id32(id) }, "latest"])).slice(-40); }
+    catch { complete = false; return; }
+    if (owner.toLowerCase() !== w) return;
     let tier = 0;
-    try { tier = Number(BigInt(await rpc(rhBase(env), "eth_call", [{ to: env.FOUNDRY_REG_ADDRESS, data: tierSel + BigInt(id).toString(16).padStart(64, "0") }, "latest"]) || "0x0")); } catch { tier = 0; }
+    try { tier = Number(BigInt(await rpcRead(rh, "eth_call", [{ to: REG, data: tierSel + id32(id) }, "latest"]) || "0x0")); } catch { tier = 0; }
     out.push({ tokenId: Number(id), tier });
+  };
+
+  if (total > 0 && total <= SCAN_CAP) {
+    for (let id = 1; id <= total; id++) { await addOwned(id); if (id < total) await sleep(60); } // gap avoids burst 429s
+  } else {
+    complete = false; // couldn't read totalSupply (or too large) → best-effort log scan, don't trust as authoritative
+    const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+    const toTopic = "0x" + id32(wallet);
+    let logs = [];
+    try { logs = await rpcRead(rh, "eth_getLogs", [{ address: NFT, topics: [TRANSFER, null, toTopic], fromBlock: "0x0", toBlock: "latest" }]); } catch { logs = []; }
+    const ids = [...new Set((logs || []).map((l) => BigInt(l.topics[3]).toString()))];
+    for (const id of ids) await addOwned(id);
   }
-  return out.sort((a, b) => a.tokenId - b.tokenId);
+  out.sort((a, b) => a.tokenId - b.tokenId);
+
+  // A fully-successful scan is authoritative → it becomes the new known-good roster. An incomplete scan is merged
+  // over the cache so a 429 can never drop a robot the wallet owns (a real transfer-away is corrected by the next
+  // complete scan). Either way we persist the best-known roster.
+  const cached = await loadRobotsCache(env, w);
+  const result = complete ? out : unionRobots(out, cached);
+  await saveRobotsCache(env, w, result);
+  return result;
 }
 
 // ── sign a BURN voucher: pick enough of the wallet's UNUSED burns to reach toTier ──

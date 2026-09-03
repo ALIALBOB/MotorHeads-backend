@@ -188,7 +188,9 @@ export async function readOwnedNftMedia(env, contractAddress, address, { max = 6
       for (const nft of (Array.isArray(data?.ownedNfts) ? data.ownedNfts : [])) {
         const id = Number(nft?.tokenId);
         if (!Number.isInteger(id) || id < 1) continue;
-        const image = nft?.image?.cachedUrl || nft?.image?.pngUrl || ipfsToHttp(nft?.image?.originalUrl) || "";
+        // Prefer the canonical metadata image through OUR edge-cached IPFS proxy (reliable) over Alchemy's cache,
+        // which frequently has no thumbnail for niche collections like the 333 Archive → the app showed placeholders.
+        const image = ipfsToHttp(nft?.raw?.metadata?.image) || nft?.image?.cachedUrl || nft?.image?.pngUrl || ipfsToHttp(nft?.image?.originalUrl) || "";
         const animation = ipfsToHttp(nft?.raw?.metadata?.animation_url || nft?.animation?.cachedUrl || "");
         out.push({ tokenId: id, name: nft?.name || nft?.raw?.metadata?.name || `#${id}`, image, animation });
       }
