@@ -22,6 +22,7 @@ import {
 } from "./http.js";
 import { loadTokenManifest } from "./manifest.js";
 import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanceResilient } from "./ownership.js";
+import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher } from "../foundry/vouchers.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -34,6 +35,8 @@ import { readCustomization, resetCustomization, saveCustomization } from "./stor
 import { validateAndNormalizeState } from "./validation.js";
 
 const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings|archive333)$/;
+// Foundry cross-chain vouchers: the backend watches Ethereum for the SIWE-logged-in wallet + signs (nobody tells us anything).
+const FOUNDRY_ROUTE = /^\/v1\/foundry\/(burn-voucher|attach-voucher|withdraw-voucher)$/;
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
 
 // Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
@@ -221,11 +224,36 @@ async function writeRoute(request, env, ctx, identity) {
   throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use PUT or DELETE for authenticated customization writes.");
 }
 
+// Foundry vouchers — session-gated. The wallet comes from the SIWE session; we verify the burn/333 on-chain + sign.
+async function foundryRoute(request, env, action) {
+  if (request.method === "OPTIONS") return customizationOptions(request, env, { methods: "POST,OPTIONS" });
+  if (request.method !== "POST") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use POST for foundry vouchers.");
+  requireFeature(env, "CUSTOMIZATION_AUTH_ENABLED", "CUSTOMIZATION_AUTH_DISABLED", "Authentication is disabled.");
+  const session = await requireSession(request, env);
+  const body = await readJsonBody(request);
+  try {
+    let out;
+    if (action === "burn-voucher") out = await signBurnVoucher(env, session.address, body.robotId, body.toTier);
+    else if (action === "attach-voucher") out = await signAttachVoucher(env, session.address, body.robotId, body.archiveId);
+    else if (action === "withdraw-voucher") out = await signWithdrawVoucher(env, session.address, body.archiveId);
+    else throw new ApiError(404, "NOT_FOUND", "Unknown foundry action.");
+    return customizationJson({ ok: true, address: session.address, ...out }, { request, env, methods: "POST,OPTIONS" });
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(400, "FOUNDRY_VOUCHER_FAILED", error?.message || "Could not issue the voucher.");
+  }
+}
+
 export async function routeCustomizationRequest(request, env = {}, ctx = {}) {
   const url = new URL(request.url);
   const authMatch = url.pathname.match(AUTH_ROUTE);
+  const foundryMatch = url.pathname.match(FOUNDRY_ROUTE);
   const customizationMatch = url.pathname.match(CUSTOMIZATION_ROUTE);
-  if (!authMatch && !customizationMatch) return null;
+  if (!authMatch && !foundryMatch && !customizationMatch) return null;
+  if (foundryMatch) {
+    try { return await foundryRoute(request, env, foundryMatch[1]); }
+    catch (error) { return customizationError(error, { request, env, cors: "auth" }); }
+  }
 
   const isPublicPolicy = Boolean(customizationMatch && (request.method === "GET" ||
     request.method === "OPTIONS" && String(request.headers.get("Access-Control-Request-Method") || "GET").toUpperCase() === "GET"));

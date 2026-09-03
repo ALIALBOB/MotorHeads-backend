@@ -5,6 +5,11 @@ compatibility_date = "2026-06-08"
 [vars]
 CORS_ORIGIN = "*"
 ALLOW_UNVERIFIED_WRITES = "false"
+# Foundry cross-chain vouchers (Robinhood mainnet dry-run). FOUNDRY_SIGNER_KEY is a SECRET (wrangler secret put).
+# ARCHIVE_VAULT_ADDRESS is filled once the vault deploys on Ethereum.
+FORGE_BRIDGE_ADDRESS = "0x4fce692b2D9489448977063814cCa3c5Fb058299"
+FOUNDRY_REG_ADDRESS = "0x1237337b75D238B426a308c4b1d43fD997aad88e"
+ROBINHOOD_RPC = "https://rpc.mainnet.chain.robinhood.com"
 # Opt-in equip is LIVE: the animation shows only what a holder has equipped on MotorHeadsEquip (0 = none).
 # Grandfathered tokens (#1/#20/#124) were seeded on-chain first. Set to "false" + redeploy to instantly revert to first-owned.
 EQUIP_READS = "true"
