@@ -36,6 +36,13 @@ export function validateItems(raw) {
     for (const k of ["dx", "dy", "dz"]) { const v = num(it[k], -3, 3, 0); if (v) o[k] = +v.toFixed(3); }
     for (const k of ["rx", "ry", "rz"]) { const v = num(it[k], -Math.PI, Math.PI, 0); if (v) o[k] = +v.toFixed(3); }
     const s = num(it.s, 0.15, 3, null); if (s !== null) o.s = +s.toFixed(3);
+    const lift = num(it.lift, -2, 2, 0); if (lift) o.lift = +lift.toFixed(3);
+    // FREE placement (dragged onto the robot in the Bench): the surface point relative to the head centre, in head
+    // widths, and the surface normal the item stands on
+    if (it.free && typeof it.free === "object" && Array.isArray(it.free.n) && it.free.n.length === 3) {
+      const nn = it.free.n.map((v) => num(v, -1, 1, 0)); const len = Math.hypot(nn[0], nn[1], nn[2]);
+      if (len > 0.5) o.free = { x: +num(it.free.x, -8, 8, 0).toFixed(3), y: +num(it.free.y, -8, 8, 0).toFixed(3), z: +num(it.free.z, -8, 8, 0).toFixed(3), n: nn.map((v) => +(v / len).toFixed(3)) };
+    }
     out.push(o);
   }
   return out;
