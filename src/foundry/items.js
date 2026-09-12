@@ -58,6 +58,40 @@ export async function readTokenItems(env, tokenId) {
   return { items: Array.isArray(items) ? items : [], wallet: row.wallet, updatedAt: Number(row.updated_at) };
 }
 
+// POSTER: a base64 JPEG the Bench renders at save time (the OpenSea image). Stored in D1 next to the items.
+const POSTER_MAX_B64 = 950000;   // ~700 KB of JPEG
+export function parsePoster(raw) {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(raw));
+  if (!m) throw new ApiError(400, "POSTER_INVALID", "poster must be a JPEG data URL.");
+  if (m[1].length > POSTER_MAX_B64) throw new ApiError(413, "POSTER_TOO_LARGE", "poster is too large.");
+  return m[1];
+}
+export async function savePoster(env, tokenId, wallet, b64) {
+  const db = env.DB; if (!db || typeof db.prepare !== "function") return;
+  const now = Math.floor(Date.now() / 1000);
+  await db.prepare("INSERT INTO mh_foundry_posters (token_id, jpeg_b64, bytes, wallet, updated_at) VALUES (?, ?, ?, ?, ?) " +
+    "ON CONFLICT(token_id) DO UPDATE SET jpeg_b64 = excluded.jpeg_b64, bytes = excluded.bytes, wallet = excluded.wallet, updated_at = excluded.updated_at")
+    .bind(tokenId, b64, Math.floor(b64.length * 3 / 4), String(wallet).toLowerCase(), now).run();
+}
+export async function readPosterMeta(env, tokenId) { const db = env.DB; if (!db || typeof db.prepare !== "function") return null; return await db.prepare("SELECT updated_at FROM mh_foundry_posters WHERE token_id = ?").bind(tokenId).first(); }
+export async function readPoster(env, tokenId) {
+  const db = env.DB; if (!db || typeof db.prepare !== "function") return null;
+  const row = await db.prepare("SELECT jpeg_b64, updated_at FROM mh_foundry_posters WHERE token_id = ?").bind(tokenId).first();
+  if (!row) return null;
+  const bin = atob(row.jpeg_b64); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return { bytes, updatedAt: Number(row.updated_at) };
+}
+export async function foundryPosterRoute(request, env, rawId) {
+  const tokenId = parseInt(rawId, 10);
+  if (!Number.isInteger(tokenId) || tokenId < 1 || tokenId > 100000) throw new ApiError(400, "TOKEN_INVALID", "Bad token id.");
+  if (request.method === "OPTIONS") { const { customizationOptions } = await import("../customization/http.js"); return customizationOptions(request, env, { cors: "public", methods: "GET,OPTIONS" }); }
+  if (request.method !== "GET") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET.");
+  const rec = await readPoster(env, tokenId);
+  if (!rec) return new Response("no poster", { status: 404, headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=30" } });
+  return new Response(rec.bytes, { status: 200, headers: { "Content-Type": "image/jpeg", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60, stale-while-revalidate=120", "X-Poster-Updated": String(rec.updatedAt) } });
+}
+
 export async function saveTokenItems(env, tokenId, wallet, items) {
   const db = env.DB;
   if (!db || typeof db.prepare !== "function") throw new ApiError(503, "STORAGE_UNAVAILABLE", "Storage is not available.");
@@ -85,7 +119,7 @@ export async function foundryItemsRoute(request, env, rawId) {
   }
   if (request.method === "GET") {
     const rec = await readTokenItems(env, tokenId);
-    return customizationJson({ ok: true, token: tokenId, items: rec ? rec.items : [], updatedAt: rec ? rec.updatedAt : null },
+    return customizationJson({ ok: true, token: tokenId, items: rec ? rec.items : [], updatedAt: rec ? rec.updatedAt : null, poster: !!(await readPosterMeta(env, tokenId)) },
       { request, env, cors: "public", cacheControl: "public, max-age=60, stale-while-revalidate=120" });
   }
   if (request.method !== "PUT") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET or PUT.");
@@ -93,11 +127,13 @@ export async function foundryItemsRoute(request, env, rawId) {
   let body;
   try { body = await request.json(); } catch { throw new ApiError(400, "BODY_INVALID", "Send JSON { items: [...] }."); }
   const items = validateItems(body && body.items);
+  const poster = parsePoster(body && body.poster);
   if (!isAdmin(env, session.address)) {
     let owned = [];
     try { owned = await readOwnedRobots(env, session.address); } catch { owned = []; }
     if (!owned.some((r) => Number(r.tokenId) === tokenId)) throw new ApiError(403, "NOT_OWNER", `Wallet does not own robot #${tokenId}.`);
   }
   const updatedAt = await saveTokenItems(env, tokenId, session.address, items);
-  return customizationJson({ ok: true, token: tokenId, items, updatedAt, address: session.address }, { request, env, methods: "PUT,OPTIONS" });
+  let posterSaved = false; if (poster) { try { await savePoster(env, tokenId, session.address, poster); posterSaved = true; } catch (e) { console.warn("poster save failed", e && e.message); } }
+  return customizationJson({ ok: true, token: tokenId, items, updatedAt, posterSaved, address: session.address }, { request, env, methods: "PUT,OPTIONS" });
 }

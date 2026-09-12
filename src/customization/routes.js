@@ -23,7 +23,7 @@ import {
 import { loadTokenManifest } from "./manifest.js";
 import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanceResilient } from "./ownership.js";
 import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher, readOwnedRobots } from "../foundry/vouchers.js";
-import { foundryItemsRoute } from "../foundry/items.js";
+import { foundryItemsRoute, foundryPosterRoute } from "../foundry/items.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -40,6 +40,7 @@ const AUTH_ROUTE = /^\/v1\/auth\/(nonce|verify|session|logout|holdings|archive33
 const FOUNDRY_ROUTE = /^\/v1\/foundry\/(burn-voucher|attach-voucher|withdraw-voucher|robots)$/;
 // The Bench record: GET public / PUT by the robot's owner (see src/foundry/items.js).
 const FOUNDRY_ITEMS_ROUTE = /^\/v1\/foundry\/items\/(\d+)$/;
+const FOUNDRY_POSTER_ROUTE = /^\/v1\/foundry\/poster\/(\d+)$/;
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
 
 // Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
@@ -257,8 +258,13 @@ export async function routeCustomizationRequest(request, env = {}, ctx = {}) {
   const authMatch = url.pathname.match(AUTH_ROUTE);
   const foundryMatch = url.pathname.match(FOUNDRY_ROUTE);
   const foundryItemsMatch = url.pathname.match(FOUNDRY_ITEMS_ROUTE);
+  const foundryPosterMatch = url.pathname.match(FOUNDRY_POSTER_ROUTE);
   const customizationMatch = url.pathname.match(CUSTOMIZATION_ROUTE);
-  if (!authMatch && !foundryMatch && !foundryItemsMatch && !customizationMatch) return null;
+  if (!authMatch && !foundryMatch && !foundryItemsMatch && !foundryPosterMatch && !customizationMatch) return null;
+  if (foundryPosterMatch) {
+    try { return await foundryPosterRoute(request, env, foundryPosterMatch[1]); }
+    catch (error) { return customizationError(error, { request, env, cors: "public" }); }
+  }
   if (foundryItemsMatch) {
     try { return await foundryItemsRoute(request, env, foundryItemsMatch[1]); }
     catch (error) { return customizationError(error, { request, env, cors: request.method === "GET" ? "public" : "auth" }); }
