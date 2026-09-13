@@ -24,6 +24,7 @@ import { loadTokenManifest } from "./manifest.js";
 import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanceResilient } from "./ownership.js";
 import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher, readOwnedRobots } from "../foundry/vouchers.js";
 import { foundryItemsRoute, foundryPosterRoute } from "../foundry/items.js";
+import { foundryFitsRoute } from "../foundry/fits.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -41,6 +42,7 @@ const FOUNDRY_ROUTE = /^\/v1\/foundry\/(burn-voucher|attach-voucher|withdraw-vou
 // The Bench record: GET public / PUT by the robot's owner (see src/foundry/items.js).
 const FOUNDRY_ITEMS_ROUTE = /^\/v1\/foundry\/items\/(\d+)$/;
 const FOUNDRY_POSTER_ROUTE = /^\/v1\/foundry\/poster\/(\d+)$/;
+const FOUNDRY_FITS_ROUTE = /^\/v1\/foundry\/fits$/;   // the fitting bench: face-on-head and backpack-on-body offsets
 const CUSTOMIZATION_ROUTE = /^\/v1\/customizations\/([^/]+)\/([^/]+)$/;
 
 // Best-effort list of the token IDs a wallet owns, from the indexer's D1 mirror (owner-indexed).
@@ -259,8 +261,13 @@ export async function routeCustomizationRequest(request, env = {}, ctx = {}) {
   const foundryMatch = url.pathname.match(FOUNDRY_ROUTE);
   const foundryItemsMatch = url.pathname.match(FOUNDRY_ITEMS_ROUTE);
   const foundryPosterMatch = url.pathname.match(FOUNDRY_POSTER_ROUTE);
+  const foundryFitsMatch = url.pathname.match(FOUNDRY_FITS_ROUTE);
   const customizationMatch = url.pathname.match(CUSTOMIZATION_ROUTE);
-  if (!authMatch && !foundryMatch && !foundryItemsMatch && !foundryPosterMatch && !customizationMatch) return null;
+  if (!authMatch && !foundryMatch && !foundryItemsMatch && !foundryPosterMatch && !foundryFitsMatch && !customizationMatch) return null;
+  if (foundryFitsMatch) {
+    try { return await foundryFitsRoute(request, env); }
+    catch (error) { return customizationError(error, { request, env, cors: request.method === "GET" ? "public" : "auth" }); }
+  }
   if (foundryPosterMatch) {
     try { return await foundryPosterRoute(request, env, foundryPosterMatch[1]); }
     catch (error) { return customizationError(error, { request, env, cors: "public" }); }
