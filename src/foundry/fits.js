@@ -11,8 +11,12 @@ import { ApiError, customizationJson } from "../customization/http.js";
 import { requireSession } from "../customization/auth.js";
 import { TREASURY_WALLET } from "../contracts.js";
 
-const KINDS = ["face", "pack"];
-const KEY_RE = { face: /^[a-z0-9_]{2,40}$/, pack: /^pack_[a-z0-9_]{2,30}\|body_[a-z0-9_]{2,30}$/ };
+// "note" is the third kind: not a fit at all, but the founder's verdict on a single MODEL (a head, a body or a
+// backpack) while reviewing it — "the crank floats", "this lid opens into the head". Those are the ones that
+// cannot be fixed by moving something and have to go back into Blender or the behaviour code.
+const KINDS = ["face", "pack", "note"];
+const KEY_RE = { face: /^[a-z0-9_]{2,40}$/, pack: /^pack_[a-z0-9_]{2,30}\|body_[a-z0-9_]{2,30}$/, note: /^[a-z0-9_]{2,40}$/ };
+const NOTE_STATUS = ["ok", "issue"];
 const MAX_SYNC = 400;   // 98 heads + 221 pack/body pairs, with room to spare
 
 function isAdmin(env, address) {
@@ -34,7 +38,13 @@ function offs(raw, what) {
 
 // One saved fit, normalised. A face fit carries both the face and the head-on-body offsets; a pack fit is one set.
 export function validateFit(kind, data) {
-  if (!KINDS.includes(kind)) throw new ApiError(400, "FIT_KIND", 'kind must be "face" or "pack".');
+  if (!KINDS.includes(kind)) throw new ApiError(400, "FIT_KIND", 'kind must be "face", "pack" or "note".');
+  if (kind === "note") {
+    const status = NOTE_STATUS.includes(String(data && data.status)) ? String(data.status) : "issue";
+    const text = String((data && data.text) || "").slice(0, 2000);
+    if (!text && status === "issue") throw new ApiError(400, "NOTE_EMPTY", "An issue needs a description.");
+    return { status, text };
+  }
   const note = String((data && data.note) || "").slice(0, 300);
   if (kind === "face") {
     const out = { face: offs(data && data.face, "face"), head: offs(data && data.head, "head") };
@@ -53,9 +63,9 @@ function checkKey(kind, key) {
 }
 
 export async function readFits(env) {
-  if (!env.DB) return { face: {}, pack: {}, count: 0, updatedAt: null };
+  if (!env.DB) return { face: {}, pack: {}, note: {}, count: 0, updatedAt: null };
   const rs = await env.DB.prepare("SELECT kind, fit_key, data, updated_at FROM mh_foundry_fits").all();
-  const out = { face: {}, pack: {}, count: 0, updatedAt: null };
+  const out = { face: {}, pack: {}, note: {}, count: 0, updatedAt: null };
   for (const row of (rs && rs.results) || []) {
     let d = null; try { d = JSON.parse(row.data); } catch { continue; }
     if (!out[row.kind]) continue;
