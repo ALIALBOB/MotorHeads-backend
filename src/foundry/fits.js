@@ -16,7 +16,9 @@ import { TREASURY_WALLET } from "../contracts.js";
 // cannot be fixed by moving something and have to go back into Blender or the behaviour code.
 const KINDS = ["face", "pack", "note"];
 const KEY_RE = { face: /^[a-z0-9_]{2,40}$/, pack: /^pack_[a-z0-9_]{2,30}\|body_[a-z0-9_]{2,30}$/, note: /^[a-z0-9_]{2,40}$/ };
-const NOTE_STATUS = ["ok", "issue"];
+// "fixed" is set by ME, not by the founder: it means the error he reported has been dealt with and the model is
+// waiting for his re-check. The bench filters on it so a second pass goes straight to what changed.
+const NOTE_STATUS = ["ok", "issue", "fixed"];
 const MAX_SYNC = 400;   // 98 heads + 221 pack/body pairs, with room to spare
 
 function isAdmin(env, address) {
