@@ -83,6 +83,10 @@ export async function createRuntime({
     rpcMode: "ok",
     walletTypeRpcMode: "ok",
     rpcCalls: [],
+    // arbitrary eth_call answers for the Foundry gates (activated / garageOf / balanceOf): calldata prefix -> result word
+    callResults: new Map(),
+    // whole JSON-RPC methods for the economy tests (eth_getTransactionByHash / Receipt / blockNumber): method -> value | (params) => value
+    rpcMethods: new Map(),
     manifestMode: "ok",
     manifestModeByToken: new Map(),
     manifestCalls: []
@@ -123,6 +127,8 @@ export async function createRuntime({
     bindings: { ...defaultBindings, ...bindings },
     d1Databases: { DB: `phase3a-${crypto.randomUUID()}` },
     d1Persist: false,
+    r2Buckets: ["FOUNDRY_PARTS"],
+    r2Persist: false,
     cachePersist: false,
     serviceBindings: {
       async OWNERSHIP_RPC(request) {
@@ -133,6 +139,7 @@ export async function createRuntime({
           return jsonResponse({ error: { message: "invalid JSON-RPC request" } }, 400);
         }
         control.rpcCalls.push(structuredClone(payload));
+        if (control.rpcMethods.has(payload?.method)) { const v = control.rpcMethods.get(payload.method); return jsonResponse({ jsonrpc: "2.0", id: payload.id, result: typeof v === "function" ? v(payload.params) : v }); }
         if (payload?.method === "eth_getCode") {
           if (control.walletTypeRpcMode === "unavailable") return jsonResponse({ error: "unavailable" }, 503);
           if (control.walletTypeRpcMode === "invalid-json") return new Response("not-json", { status: 200 });
@@ -147,6 +154,12 @@ export async function createRuntime({
         if (control.rpcMode === "invalid-json") return new Response("not-json", { status: 200 });
         if (control.rpcMode === "invalid-result") {
           return jsonResponse({ jsonrpc: "2.0", id: payload.id, result: "0x1234" });
+        }
+        if (payload?.method === "eth_call") {
+          const data = String(payload?.params?.[0]?.data || "").toLowerCase();
+          for (const [prefix, result] of control.callResults) {
+            if (data.startsWith(String(prefix).toLowerCase())) return jsonResponse({ jsonrpc: "2.0", id: payload.id, result: typeof result === "function" ? result(data, payload.params[0]) : result });
+          }
         }
         const tokenId = tokenIdFromOwnerCall(payload?.params?.[0]?.data);
         if (payload?.method !== "eth_call" || tokenId === null) {

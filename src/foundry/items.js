@@ -1,18 +1,32 @@
-// The Foundry BENCH record: which accessory items a 3D MotorHead wears, and where.
-//   GET  /v1/foundry/items/:tokenId   public, open CORS, edge-cached 60 s  -> { ok, token, items, updatedAt }
-//   PUT  /v1/foundry/items/:tokenId   SIWE session; the wallet must OWN the robot (readOwnedRobots) or be the admin
-//                                     body { items: [ { glb, anchor?, dx?, dy?, dz?, rx?, ry?, rz?, s? } ] }
-// The site worker reads GET on /foundry/anim/:id and injects the array as window.__COMP__.items — the scene's
-// loadItems() renders them. This is the first field of the per-token record; head/body/pack overrides come next.
+// The Foundry PER-TOKEN RECORD: what the owner changed on a 3D MotorHead. One row per token, two fields:
+//   overrides  { head?, body?, pack?, expr? }   the owner's SWITCHES over the frozen DNA (validated against roster.json;
+//                                               pack "" = no backpack; the colourway is NEVER switchable)
+//   items      [ { glb, anchor?, dx?, dy?, dz?, rx?, ry?, rz?, s?, lift?, free? } ]   Bench parts and where they sit
+//   GET  /v1/foundry/items/:tokenId   public, open CORS, edge-cached 60 s  -> { ok, token, items, overrides, updatedAt, poster }
+//   PUT  /v1/foundry/items/:tokenId   SIWE session; the wallet must OWN the token or be an admin; body
+//                                     { items?, overrides?, poster? } — a field left out keeps what is saved.
+// OWNERSHIP (FOUNDRY_OWNERSHIP): "eth" = ownerOf on the 2D collection (Ethereum — the collection the 3D art replaces in
+//   place), "rig" = the Robinhood test collection (readOwnedRobots), "both" (default) = either, for the transition.
+// GATES — founder 2026-09-17: "the switching and adding parts should be day one, we can use the same activation and
+// part contract" — both read on Ethereum mainnet (src/foundry/chain.js), admins bypass both:
+//   FOUNDRY_REQUIRE_ACTIVATION=true   a save needs ScrapCrates.activated(tokenId): the one-time 0.003 ETH garage activation
+//   FOUNDRY_PART_IDS='{"items":{"tophat":5},"head":{"carousel":12},"body":{},"pack":{}}'   an item or switch mapped to a
+//                                     ScrapParts id must be held by the token's garage (ERC-1155 balanceOf); unmapped = free
+// The site worker reads GET for /foundry/anim/:id (window.__COMP__) and /foundry/meta/:id (traits), through compFor().
 import { ApiError, customizationJson } from "../customization/http.js";
 import { requireSession } from "../customization/auth.js";
 import { readOwnedRobots } from "./vouchers.js";
 import { TREASURY_WALLET } from "../contracts.js";
+import { ownerOf2D, isActivated, garageHasParts, SCRAP_CRATES } from "./chain.js";
+import { assertItemsOwned, assertSwitchesOwned, readCatalogue, takeSiteFee, publicState } from "./economy.js";
+import roster from "./roster.js";
 
 // The wearable GLBs that exist under /foundry-glb/item_<key>.glb on the site. Keep in sync with the Bench tray.
 export const ITEM_KEYS = ["tophat", "aviatorduck", "thugshades", "steamgoggles"];
 const ANCHORS = ["top", "face", "neck", "back"];
 const MAX_ITEMS = 8;
+const OVERRIDE_KEYS = ["head", "body", "pack", "expr"];
+const LOCKED_KEYS = ["scheme", "colourway", "colorway", "colour", "color", "gold"];
 
 function num(v, lo, hi, dflt) {
   if (v === undefined || v === null || v === "") return dflt;
@@ -21,13 +35,14 @@ function num(v, lo, hi, dflt) {
   return Math.min(hi, Math.max(lo, n));
 }
 
-export function validateItems(raw) {
+// `allowed` = the part keys that exist: the four built-in ones + every part in the catalogue (parts are data — src/foundry/parts.js)
+export function validateItems(raw, allowed = ITEM_KEYS) {
   if (!Array.isArray(raw)) throw new ApiError(400, "ITEMS_INVALID", "items must be an array.");
   if (raw.length > MAX_ITEMS) throw new ApiError(400, "ITEMS_TOO_MANY", `At most ${MAX_ITEMS} items.`);
   const out = [];
   for (const it of raw) {
     const glb = String((it && (it.glb || it.item || it.name)) || "").toLowerCase();
-    if (!ITEM_KEYS.includes(glb)) throw new ApiError(400, "ITEM_UNKNOWN", `Unknown item "${glb}".`);
+    if (!allowed.includes(glb)) throw new ApiError(400, "ITEM_UNKNOWN", `Unknown item "${glb}".`);
     const o = { glb };
     if (it.anchor !== undefined && it.anchor !== null && it.anchor !== "") {
       if (!ANCHORS.includes(String(it.anchor))) throw new ApiError(400, "ITEM_INVALID", "Bad anchor.");
@@ -48,14 +63,49 @@ export function validateItems(raw) {
   return out;
 }
 
+// The owner's switches: { head?, body?, pack?, expr? } with only the keys that are set. `undefined` in = "keep what is
+// saved"; null in = reset to the DNA; pack "" / null / "none" = no backpack. Anything outside the roster is refused,
+// and any attempt at the colourway is refused by name so the client gets a clear answer, not a silent drop.
+export function validateOverrides(raw) {
+  if (raw === undefined) return undefined;
+  if (raw === null) return {};
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new ApiError(400, "OVERRIDES_INVALID", "overrides must be an object.");
+  const out = {};
+  for (const k of Object.keys(raw)) {
+    if (LOCKED_KEYS.includes(k)) throw new ApiError(400, "COLOURWAY_LOCKED", "The colourway is fixed at mint and cannot be switched.");
+    if (!OVERRIDE_KEYS.includes(k)) throw new ApiError(400, "OVERRIDES_INVALID", `Unknown override "${k}".`);
+    const v = raw[k];
+    if (v === undefined) continue;
+    if (v === null || v === "") { if (k === "pack") out.pack = ""; continue; }
+    const s = String(v).toLowerCase().replace(/\.glb$/, "");
+    if (k === "head" && !roster.heads.includes(s)) throw new ApiError(400, "OVERRIDE_UNKNOWN", `Unknown head "${s}".`);
+    if (k === "body" && !roster.bodies.includes(s)) throw new ApiError(400, "OVERRIDE_UNKNOWN", `Unknown body "${s}".`);
+    if (k === "pack") { if (s === "none") { out.pack = ""; continue; } if (!roster.packs.includes(s)) throw new ApiError(400, "OVERRIDE_UNKNOWN", `Unknown backpack "${s}".`); }
+    if (k === "expr" && !roster.exprs.includes(s)) throw new ApiError(400, "OVERRIDE_UNKNOWN", `Unknown expression "${s}".`);
+    out[k] = s;
+  }
+  return out;
+}
+
+const noColumn = (e) => /no such column|has no column named/i.test(String((e && e.message) || ""));   // SELECT vs INSERT wording of SQLite
+
 export async function readTokenItems(env, tokenId) {
   const db = env.DB;
   if (!db || typeof db.prepare !== "function") return null;
-  const row = await db.prepare("SELECT items, wallet, updated_at FROM mh_foundry_items WHERE token_id = ?").bind(tokenId).first();
+  let row, hasOverrides = true;
+  try { row = await db.prepare("SELECT items, overrides, wallet, updated_at FROM mh_foundry_items WHERE token_id = ?").bind(tokenId).first(); }
+  catch (e) {   // migration 0006 not applied yet: the record still answers, without switches
+    if (!noColumn(e)) throw e;
+    hasOverrides = false;
+    row = await db.prepare("SELECT items, wallet, updated_at FROM mh_foundry_items WHERE token_id = ?").bind(tokenId).first();
+  }
   if (!row) return null;
   let items = [];
   try { items = JSON.parse(row.items); } catch { items = []; }
-  return { items: Array.isArray(items) ? items : [], wallet: row.wallet, updatedAt: Number(row.updated_at) };
+  let overrides = {};
+  if (hasOverrides && row.overrides) { try { overrides = JSON.parse(row.overrides); } catch { overrides = {}; } }
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) overrides = {};
+  return { items: Array.isArray(items) ? items : [], overrides, wallet: row.wallet, updatedAt: Number(row.updated_at) };
 }
 
 // POSTER: a base64 JPEG the Bench renders at save time (the OpenSea image). Stored in D1 next to the items.
@@ -92,20 +142,76 @@ export async function foundryPosterRoute(request, env, rawId) {
   return new Response(rec.bytes, { status: 200, headers: { "Content-Type": "image/jpeg", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60, stale-while-revalidate=120", "X-Poster-Updated": String(rec.updatedAt) } });
 }
 
-export async function saveTokenItems(env, tokenId, wallet, items) {
+export async function saveTokenItems(env, tokenId, wallet, items, overrides) {
   const db = env.DB;
   if (!db || typeof db.prepare !== "function") throw new ApiError(503, "STORAGE_UNAVAILABLE", "Storage is not available.");
   const now = Math.floor(Date.now() / 1000);
-  await db.prepare(
-    "INSERT INTO mh_foundry_items (token_id, items, wallet, updated_at) VALUES (?, ?, ?, ?) " +
-    "ON CONFLICT(token_id) DO UPDATE SET items = excluded.items, wallet = excluded.wallet, updated_at = excluded.updated_at"
-  ).bind(tokenId, JSON.stringify(items), String(wallet).toLowerCase(), now).run();
+  const w = String(wallet).toLowerCase(), itemsJson = JSON.stringify(items);
+  const ovJson = (overrides && Object.keys(overrides).length) ? JSON.stringify(overrides) : null;   // null = exactly the DNA
+  try {
+    await db.prepare(
+      "INSERT INTO mh_foundry_items (token_id, items, overrides, wallet, updated_at) VALUES (?, ?, ?, ?, ?) " +
+      "ON CONFLICT(token_id) DO UPDATE SET items = excluded.items, overrides = excluded.overrides, wallet = excluded.wallet, updated_at = excluded.updated_at"
+    ).bind(tokenId, itemsJson, ovJson, w, now).run();
+  } catch (e) {
+    if (!noColumn(e)) throw e;
+    // migration 0006 not applied on this database: items still save as before; a switch cannot be stored yet
+    if (ovJson) throw new ApiError(503, "OVERRIDES_UNAVAILABLE", "Switching is not enabled on this server yet.", { retryable: false });
+    await db.prepare(
+      "INSERT INTO mh_foundry_items (token_id, items, wallet, updated_at) VALUES (?, ?, ?, ?) " +
+      "ON CONFLICT(token_id) DO UPDATE SET items = excluded.items, wallet = excluded.wallet, updated_at = excluded.updated_at"
+    ).bind(tokenId, itemsJson, w, now).run();
+  }
   return now;
 }
 
 function isAdmin(env, address) {
   const list = String(env.FOUNDRY_ADMIN_WALLETS || TREASURY_WALLET).split(",").map((a) => a.trim().toLowerCase()).filter(Boolean);
   return list.includes(String(address).toLowerCase());
+}
+
+// Does this wallet own the token? Ethereum first (the real collection), the Robinhood test rig as the transition fallback.
+async function ownsToken(env, address, tokenId) {
+  const w = String(address).toLowerCase(), mode = String(env.FOUNDRY_OWNERSHIP || "both").toLowerCase();
+  if (mode !== "rig") {
+    try { if ((await ownerOf2D(env, tokenId)) === w) return true; }
+    catch (e) { if (mode === "eth") throw new ApiError(503, "OWNERSHIP_CHECK_UNAVAILABLE", "Ethereum ownership verification is temporarily unavailable.", { retryable: true }); }
+  }
+  if (mode !== "eth") {
+    let owned = [];
+    try { owned = await readOwnedRobots(env, w); } catch { owned = []; }
+    if (owned.some((r) => Number(r.tokenId) === tokenId)) return true;
+  }
+  return false;
+}
+
+async function assertActivated(env, tokenId) {
+  if (String(env.FOUNDRY_REQUIRE_ACTIVATION || "").toLowerCase() !== "true") return;
+  let on = false;
+  try { on = await isActivated(env, tokenId); }
+  catch { throw new ApiError(503, "ACTIVATION_CHECK_UNAVAILABLE", "The activation check is temporarily unavailable.", { retryable: true }); }
+  if (!on) throw new ApiError(403, "NOT_ACTIVATED", `MotorHead #${tokenId} is not activated yet. Activate it in the garage first (one-time fee), then save.`, { details: { crates: SCRAP_CRATES } });
+}
+
+function partIdMap(env) {
+  let m = {};
+  try { m = JSON.parse(String(env.FOUNDRY_PART_IDS || "{}")); } catch { m = {}; }
+  return (m && typeof m === "object") ? m : {};
+}
+// every ScrapParts id this save needs the garage to hold (items and switches that are mapped to a part; unmapped = free)
+export function requiredPartIds(env, items, overrides) {
+  const m = partIdMap(env), ids = [];
+  for (const it of items || []) { const id = Number((m.items || {})[it.glb] || 0); if (id > 0) ids.push(id); }
+  for (const k of ["head", "body", "pack"]) { const v = overrides && overrides[k]; if (v) { const id = Number((m[k] || {})[v] || 0); if (id > 0) ids.push(id); } }
+  return [...new Set(ids)];
+}
+async function assertPartsHeld(env, tokenId, items, overrides) {
+  const ids = requiredPartIds(env, items, overrides);
+  if (!ids.length) return;
+  let res;
+  try { res = await garageHasParts(env, tokenId, ids); }
+  catch { throw new ApiError(503, "PARTS_CHECK_UNAVAILABLE", "The parts check is temporarily unavailable.", { retryable: true }); }
+  if (res.missing.length) throw new ApiError(403, "PART_NOT_OWNED", `MotorHead #${tokenId}'s garage does not hold part${res.missing.length > 1 ? "s" : ""} ${res.missing.join(", ")}.`, { details: { missing: res.missing, garage: res.garage } });
 }
 
 export async function foundryItemsRoute(request, env, rawId) {
@@ -119,21 +225,42 @@ export async function foundryItemsRoute(request, env, rawId) {
   }
   if (request.method === "GET") {
     const rec = await readTokenItems(env, tokenId);
-    return customizationJson({ ok: true, token: tokenId, items: rec ? rec.items : [], updatedAt: rec ? rec.updatedAt : null, poster: !!(await readPosterMeta(env, tokenId)) },
+    // `state` is what a marketplace shows a buyer (activated, tier, weight) — D1 plus the activation cache, cheap enough for tokenURI
+    let state = null; try { state = await publicState(env, tokenId); } catch { state = null; }
+    let items = rec ? rec.items : [], names = {};
+    if (items.length) { try {
+      const cat = await readCatalogue(env, { all: true });
+      // A PAID part that this robot no longer holds has been moved to another robot — stop wearing it here. The saved
+      // placement is kept, so moving it back brings the look back. Only ever filtered when the chain actually answered.
+      if (state && state.heldOk && Array.isArray(state.owned)) {
+        items = items.filter((it) => { const c = cat.find((x) => x.key === it.glb);
+          if (!c || (!c.partId && BigInt(c.priceWei || 0) === 0n)) return true;   // a free part is nobody's to take away
+          return state.owned.includes(it.glb); });
+      }
+      for (const it of items) { const c = cat.find((x) => x.key === it.glb); if (c) names[it.glb] = c.name; }
+    } catch { names = {}; } }
+    return customizationJson({ ok: true, token: tokenId, names, state, items, overrides: rec ? rec.overrides : {}, updatedAt: rec ? rec.updatedAt : null, poster: !!(await readPosterMeta(env, tokenId)) },
       { request, env, cors: "public", cacheControl: "public, max-age=60, stale-while-revalidate=120" });
   }
   if (request.method !== "PUT") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET or PUT.");
   const session = await requireSession(request, env);
   let body;
-  try { body = await request.json(); } catch { throw new ApiError(400, "BODY_INVALID", "Send JSON { items: [...] }."); }
-  const items = validateItems(body && body.items);
+  try { body = await request.json(); } catch { throw new ApiError(400, "BODY_INVALID", "Send JSON { items: [...], overrides: {...} }."); }
+  const existing = await readTokenItems(env, tokenId);
+  let allowed = ITEM_KEYS; if (body && body.items !== undefined) { try { allowed = [...new Set([...ITEM_KEYS, ...(await readCatalogue(env, { all: true })).filter((c) => c.kind === "item").map((c) => c.key)])]; } catch { allowed = ITEM_KEYS; } }
+  const items = (body && body.items === undefined) ? (existing ? existing.items : []) : validateItems(body && body.items, allowed);
+  const ov = validateOverrides(body ? body.overrides : undefined);
+  const overrides = ov === undefined ? (existing ? existing.overrides : {}) : ov;
   const poster = parsePoster(body && body.poster);
   if (!isAdmin(env, session.address)) {
-    let owned = [];
-    try { owned = await readOwnedRobots(env, session.address); } catch { owned = []; }
-    if (!owned.some((r) => Number(r.tokenId) === tokenId)) throw new ApiError(403, "NOT_OWNER", `Wallet does not own robot #${tokenId}.`);
+    if (!(await ownsToken(env, session.address, tokenId))) throw new ApiError(403, "NOT_OWNER", `Wallet does not own MotorHead #${tokenId}.`);
+    await assertActivated(env, tokenId);
+    await assertPartsHeld(env, tokenId, items, overrides);
+    await assertItemsOwned(env, tokenId, items);   // a part on sale in the shop (migration 0008) must belong to the robot
+    await assertSwitchesOwned(env, tokenId, overrides, existing ? existing.overrides : {});   // no free switch: only a custom build the robot owns (migration 0012)
   }
-  const updatedAt = await saveTokenItems(env, tokenId, session.address, items);
+  await takeSiteFee(env, session, { txHash: body && body.feeTx, kind: "feesave", tokenId, ref: "save" });   // every Bench save carries the site fee — taken LAST, after every check, so a refused save never costs a fee
+  const updatedAt = await saveTokenItems(env, tokenId, session.address, items, overrides);
   let posterSaved = false; if (poster) { try { await savePoster(env, tokenId, session.address, poster); posterSaved = true; } catch (e) { console.warn("poster save failed", e && e.message); } }
-  return customizationJson({ ok: true, token: tokenId, items, updatedAt, posterSaved, address: session.address }, { request, env, methods: "PUT,OPTIONS" });
+  return customizationJson({ ok: true, token: tokenId, items, overrides, updatedAt, posterSaved, address: session.address }, { request, env, methods: "PUT,OPTIONS" });
 }

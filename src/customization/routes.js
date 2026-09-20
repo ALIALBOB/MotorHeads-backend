@@ -25,6 +25,9 @@ import { readCurrentOwner, readOwnedTokenIds, readOwnedNftMedia, readOwnerBalanc
 import { signBurnVoucher, signAttachVoucher, signWithdrawVoucher, readOwnedRobots } from "../foundry/vouchers.js";
 import { foundryItemsRoute, foundryPosterRoute } from "../foundry/items.js";
 import { foundryFitsRoute } from "../foundry/fits.js";
+import { foundryEconomyRoute, ECONOMY_ROUTE } from "../foundry/economy.js";
+import { foundryRoundsRoute, ROUNDS_ROUTE } from "../foundry/rounds.js";
+import { foundryPartsRoute, PARTS_ROUTE } from "../foundry/parts.js";
 import { enforceRateLimit } from "./rate-limit.js";
 import {
   parseNonceBody,
@@ -263,6 +266,21 @@ export async function routeCustomizationRequest(request, env = {}, ctx = {}) {
   const foundryPosterMatch = url.pathname.match(FOUNDRY_POSTER_ROUTE);
   const foundryFitsMatch = url.pathname.match(FOUNDRY_FITS_ROUTE);
   const customizationMatch = url.pathname.match(CUSTOMIZATION_ROUTE);
+  const economyMatch = url.pathname.match(ECONOMY_ROUTE);
+  const partsMatch = url.pathname.match(PARTS_ROUTE);
+  if (partsMatch) {
+    try { return await foundryPartsRoute(request, env, partsMatch); }
+    catch (error) { return customizationError(error, { request, env, cors: request.method === "GET" ? "public" : undefined }); }
+  }
+  const roundsMatch = url.pathname.match(ROUNDS_ROUTE);
+  if (roundsMatch) {
+    try { return await foundryRoundsRoute(request, env, roundsMatch); }
+    catch (error) { return customizationError(error, { request, env, cors: request.method === "GET" ? "public" : undefined }); }
+  }
+  if (economyMatch) {
+    try { return await foundryEconomyRoute(request, env, economyMatch); }
+    catch (error) { return customizationError(error, { request, env, cors: request.method === "GET" ? "public" : undefined }); }
+  }
   if (!authMatch && !foundryMatch && !foundryItemsMatch && !foundryPosterMatch && !foundryFitsMatch && !customizationMatch) return null;
   if (foundryFitsMatch) {
     try { return await foundryFitsRoute(request, env); }

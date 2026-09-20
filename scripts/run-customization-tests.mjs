@@ -1,5 +1,8 @@
 import { runApiSuite } from "../tests/customization/api-suite.mjs";
 import { runAuthSuite } from "../tests/customization/auth-suite.mjs";
+import { runFoundryItemsSuite } from "../tests/customization/foundry-items-suite.mjs";
+import { runFoundryEconomySuite } from "../tests/customization/foundry-economy-suite.mjs";
+import { runFoundryRoundsSuite } from "../tests/customization/foundry-rounds-suite.mjs";
 import { runHardeningSuite } from "../tests/customization/hardening-suite.mjs";
 import { runMigrationAudit } from "../tests/customization/migration-audit.mjs";
 import { runOwnershipSuite } from "../tests/customization/ownership-suite.mjs";
@@ -11,7 +14,10 @@ const SUITES = Object.freeze({
   ownership: { run: runOwnershipSuite, report: "ownership-test-results.json" },
   api: { run: runApiSuite, report: "api-test-results.json" },
   hardening: { run: runHardeningSuite, report: "hardening-test-results.json" },
-  regression: { run: runRegressionSuite, report: "regression-results.json" }
+  regression: { run: runRegressionSuite, report: "regression-results.json" },
+  foundry: { run: runFoundryItemsSuite, report: "foundry-items-results.json" },
+  economy: { run: runFoundryEconomySuite, report: "foundry-economy-results.json" },
+  rounds: { run: runFoundryRoundsSuite, report: "foundry-rounds-results.json" }
 });
 
 function selectedGroups() {

@@ -15,6 +15,9 @@ ROBINHOOD_RPC = "https://rpc.mainnet.chain.robinhood.com"
 # Opt-in equip is LIVE: the animation shows only what a holder has equipped on MotorHeadsEquip (0 = none).
 # Grandfathered tokens (#1/#20/#124) were seeded on-chain first. Set to "false" + redeploy to instantly revert to first-owned.
 EQUIP_READS = "true"
+FOUNDRY_OWNERSHIP = "eth"   # ONLY the real Ethereum collection authorises an edit; the default "both" let a REHEARSAL-collection token edit a live NFT
+FOUNDRY_REQUIRE_ACTIVATION = "true"   # parts and custom builds only go on an ACTIVATED robot (founder 2026-09-19); buying one already required it
+FOUNDRY_SITE_FEE_USD = "1"   # the site fee in USD, charged in ETH on every paid or saved action (src/foundry/economy.js siteFee); "0" = off
 MOTORHEADS_DEPLOY_BLOCK = "25261729"
 INDEXER_CONFIRMATIONS = "6"
 INDEXER_MAX_BLOCK_RANGE = "1000"
@@ -53,6 +56,11 @@ HOLDER_PLACEMENT_BASE_URL = ""
 
 [triggers]
 crons = ["*/5 * * * *"]
+
+# Bench parts published from /admin: the 3D model + its picture (src/foundry/parts.js). A NEW bucket, nothing else lives in it.
+[[r2_buckets]]
+binding = "FOUNDRY_PARTS"
+bucket_name = "motorheads-foundry-parts"
 
 [[d1_databases]]
 binding = "DB"

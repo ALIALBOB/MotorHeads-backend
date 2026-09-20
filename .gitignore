@@ -21,3 +21,4 @@ reports/customization-backend-beta/*-test-results.json
 reports/customization-backend-beta/regression-results.json
 reports/customization-backend-beta/local-proof-results.json
 reports/customization-backend-beta/migration-audit.json
+reports/customization-backend-beta/foundry-*-results.json
