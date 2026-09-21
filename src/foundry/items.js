@@ -144,6 +144,35 @@ export async function foundryPosterRoute(request, env, rawId) {
   if (!Number.isInteger(tokenId) || tokenId < 1 || tokenId > 100000) throw new ApiError(400, "TOKEN_INVALID", "Bad token id.");
   if (request.method === "OPTIONS") { const { customizationOptions } = await import("../customization/http.js"); return customizationOptions(request, env, { cors: "public", methods: "GET,OPTIONS" }); }
   if (request.method !== "GET") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use GET.");
+  // A POSTER IS ONLY THE TOKEN'S PICTURE WHILE THE TOKEN IS ACTUALLY CUSTOMISED.
+  //
+  // It is rendered at Save and then just sits in the table — nothing clears it when the robot stops
+  // wearing what it shows. #1 was saved wearing the Thug Shades, the part later moved to #48, and #1's
+  // poster kept showing a robot in glasses it no longer owns. The metadata already got this right (an
+  // un-customised token serves the pinned still, which is why OpenSea showed #1 bare) — the picture the
+  // SITE asks for did not, so the two disagreed about the same token. Same rule in both places now:
+  // no custom record, no poster. The row is kept, so putting the parts back brings the poster back with
+  // them, exactly like the saved placements.
+  const saved = await readTokenItems(env, tokenId);
+  const worn = saved && Array.isArray(saved.items) ? saved.items : [];
+  const ov = saved && saved.overrides ? saved.overrides : null;
+  const switched = !!(ov && Object.keys(ov).some((k) => ov[k] !== undefined && ov[k] !== null && ov[k] !== ""));
+  let stillHolds = worn.length > 0;
+  if (stillHolds) {
+    // the same holdings filter the items route applies: a part that moved is not worn here any more, so a
+    // poster showing it is not this robot's picture either
+    try {
+      const st = await publicState(env, tokenId);
+      const cat = await readCatalogue(env, { all: true });
+      if (st && st.heldOk && Array.isArray(st.owned)) {
+        stillHolds = worn.some((it) => { const c = cat.find((x) => x.key === it.glb);
+          if (!c || (!c.partId && BigInt(c.priceWei || 0) === 0n)) return true;
+          return st.owned.includes(it.glb); });
+      }
+    } catch { /* the chain did not answer: keep the poster rather than blank a robot over an RPC blip */ }
+  }
+  if (!stillHolds && !switched) return new Response("not customised", { status: 404, headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=30" } });
+
   const rec = await readPoster(env, tokenId);
   if (!rec) return new Response("no poster", { status: 404, headers: { "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=30" } });
   return new Response(rec.bytes, { status: 200, headers: { "Content-Type": "image/jpeg", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60, stale-while-revalidate=120", "X-Poster-Updated": String(rec.updatedAt) } });

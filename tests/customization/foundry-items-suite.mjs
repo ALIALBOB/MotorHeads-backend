@@ -172,5 +172,41 @@ export async function runFoundryItemsSuite() {
       assertApi(await put(runtime, o.cookie, 7, { overrides: { head: "carousel" } }), 503, "OVERRIDES_UNAVAILABLE");
     }));
 
+  // A poster is rendered at Save and then just SITS in the table — nothing clears it when the robot stops
+  // wearing what it shows. #1 was saved in the Thug Shades, the part moved to #48, and #1's poster kept
+  // showing glasses it no longer owns while the metadata (correctly) served the plain still: one token,
+  // two pictures. The poster now stands in only while the token really is customised, judged on the SAME
+  // view of the record the metadata uses — so a part that moved away drops out of it too (that filter has
+  // its own regression test in foundry-economy-suite; here the record is emptied directly, which needs no
+  // chain and exercises the same rule).
+  await suite.test("a saved poster is served only while the robot is still customised", () =>
+    withRuntime(createRuntime, { bindings: { ...ETH_ONLY } }, async (runtime) => {
+      await applyMigrations(runtime, WITH_OVERRIDES);
+      const owner = ephemeral(); runtime.control.owners.set(7, owner.address.toLowerCase());
+      runtime.control.owners.set(8, owner.address.toLowerCase());
+      const o = await authenticate(runtime, owner, { ip: "127.7.7.9" });
+      const JPEG = "data:image/jpeg;base64," + btoa("ÿØÿ" + "p".repeat(64));
+      // callApi answers { response, body, text } — the status lives on response, not on the result
+      const poster = async (id) => (await callApi(runtime, `/v1/foundry/poster/${id}`)).response.status;
+
+      assert.equal(await poster(7), 404, "a token with no record has nothing to stand in for");
+
+      assertApi(await put(runtime, o.cookie, 7, { items: [{ glb: "thugshades" }], poster: JPEG }), 200);
+      assert.equal(await poster(7), 200, "a robot wearing a part shows the poster that was rendered for it");
+
+      assertApi(await put(runtime, o.cookie, 7, { items: [] }), 200);                 // the parts come off
+      assert.equal(await poster(7), 404, "once the robot wears nothing, its poster is not its picture any more");
+
+      assertApi(await put(runtime, o.cookie, 7, { items: [{ glb: "thugshades" }] }), 200);
+      assert.equal(await poster(7), 200, "putting the part back brings the poster back — the row was kept, not deleted");
+
+      // a SWITCHED robot is customised too, even with no items on it
+      assertApi(await put(runtime, o.cookie, 8, { overrides: { head: "clock_head" }, poster: JPEG }), 200);
+      assert.equal(await poster(8), 200, "a switched build is a custom robot, so its poster stands");
+      assertApi(await put(runtime, o.cookie, 8, { overrides: null }), 200);           // back to base
+      assert.equal(await poster(8), 404, "back to the base build, the poster stops standing in");
+      return { noRecord: 404, worn: 200, strippedBare: 404, restored: 200, switched: 200, backToBase: 404 };
+    }));
+
   return suite.result();
 }
