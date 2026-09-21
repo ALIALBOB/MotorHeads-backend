@@ -263,10 +263,17 @@ export async function runFoundryEconomySuite() {
       assertApi(await putCat("tophat", { bonus: 0.2 }, await sign(admin)), 400, "BONUS_INVALID");
       assertApi(await putCat("jetpack", { name: "Jet Pack", priceWei: "3000000000000000", bonus: 0.01, sort: 9 }, await sign(admin)), 200);
       assertApi(await putCat("thugshades", { active: false }, await sign(admin)), 200);
-      const pub = assertApi(await callApi(runtime, "/v1/foundry/catalogue"), 200).body.items.map((i) => i.key);
-      assert.deepEqual(pub, ["tophat", "aviatorduck", "steamgoggles", "jetpack"]);                                                     // retired part gone from the shop…
+      // Retiring takes a part off SALE — it does not erase it. The public list still names every part and
+      // flags which are on sale, because somebody already owns a retired one (or was granted a commission
+      // that was never on sale at all) and their Bench has to be able to name it and put it on.
+      const pub = assertApi(await callApi(runtime, "/v1/foundry/catalogue"), 200).body.items;
+      assert.deepEqual(pub.map((i) => i.key), ["tophat", "aviatorduck", "thugshades", "steamgoggles", "jetpack"]);
+      assert.equal(pub.find((c) => c.key === "thugshades").active, false);                                                             // …flagged, so the shop skips it
+      assert.deepEqual(pub.filter((c) => c.active !== false).map((c) => c.key), ["tophat", "aviatorduck", "steamgoggles", "jetpack"]);
+      // and being listed is NOT being on sale: nobody can buy a retired part, whatever they send
+      assertApi(await post(runtime, cookie, "buy", { tokenId: 7, itemKey: "thugshades", txHash: HASH(30) }), 404, "ITEM_UNKNOWN");
       const all = assertApi(await callApi(runtime, "/v1/foundry/catalogue?all=1", { origin: LOCAL_ORIGIN, headers: await sign(admin) }), 200).body.items;
-      assert.equal(all.length, 5); assert.equal(all.find((c) => c.key === "thugshades").active, false);                                 // …but still in the admin list
+      assert.equal(all.length, 5); assert.equal(all.find((c) => c.key === "thugshades").active, false);                                 // …and the admin list is unchanged
       // the new price is the price: the old one is now an underpayment
       payment(runtime.control, { from: owner.address, value: 2000000000000000n });
       assertApi(await post(runtime, cookie, "buy", { tokenId: 7, itemKey: "tophat", txHash: HASH(31) }), 400, "TX_UNDERPAID");

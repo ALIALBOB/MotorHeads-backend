@@ -1,0 +1,6 @@
+# The vendored holder-validation artifact is signed BYTE FOR BYTE: artifact.json records a sha256 of
+# every file, and scripts/verify-holder-validation-artifact.mjs re-hashes them on disk. Git's automatic
+# line-ending conversion rewrote 6 of the 8 files to CRLF on a Windows checkout, so every hash missed and
+# the tamper check failed on a clean tree — a tripwire that cries wolf is a tripwire nobody reads.
+# Treat the artifact as binary: never convert it, so the only thing that can change a hash is a real edit.
+src/vendor/holder-validation/** -text
