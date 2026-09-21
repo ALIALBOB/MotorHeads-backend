@@ -57,6 +57,22 @@ export default {
         console.error("MotorHeads chain indexer failed", error);
       })
     );
+    // Keep the activation cache warm. A marketplace re-indexing the collection asks for all 5555 tokens at
+    // once and each one used to trigger its own activation read — the RPC rate-limited, most failed, and
+    // those tokens were served with NO Activated/Tier/Weight/Parts trait at all. Served from D1 instead,
+    // that whole burst costs nothing. One Multicall3 per run walks 400 ids and remembers where it stopped,
+    // so the full collection is refreshed about every hour.
+    ctx.waitUntil(
+      (async () => {
+        try {
+          const { warmActivation } = await import("./foundry/economy.js");
+          const r = await warmActivation(env);
+          if (r && r.error) console.warn("activation warm-up skipped:", r.error);
+        } catch (error) {
+          console.warn("activation warm-up failed", error);
+        }
+      })()
+    );
     // NOTE: historical sale backfill is NOT run on the cron — with a 5000/day RPC budget, grinding the ~4k
     // transfer backlog would starve the indexer. It's done out-of-band (local script on a free public RPC) +
     // the gated /v1/indexer/backfill-sales endpoint for deliberate, throttled runs. Forward detection is live.

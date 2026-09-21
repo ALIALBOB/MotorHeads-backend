@@ -200,7 +200,7 @@ export async function activatedCached(env, tokenId, { cacheOnly = false } = {}) 
   if (row && Number(row.active) === 1) return true;
   if (cacheOnly) return row ? false : null;
   if (row && Math.floor(Date.now() / 1000) - Number(row.checked_at) < ACT_RECHECK) return false;
-  let active; try { active = await isActivated(env, tokenId); } catch { return row ? false : null; }
+  let active; try { active = await isActivated(env, tokenId); } catch { return false; }   // not cached: the next read retries
   await rememberActivated(env, tokenId, active); return active;
 }
 
@@ -269,6 +269,27 @@ export async function publicState(env, tokenId) {
   // `owned` + `heldOk` let the public record drop a part that has MOVED to another robot (heldOk false = the chain did not
   // answer, and nothing is dropped — a look must never blank out over an RPC blip).
   return { activated, tier, archives: attached.length, parts: bought.length, weight: activated ? weightOf(tier, 0, Math.min(ITEM_BONUS_CAP, itemBonus)) : 0, owned, heldOk };
+}
+
+// Fill the activation cache a slice at a time, so a marketplace re-indexing all 5555 tokens is served from
+// D1 and never has to reach Ethereum. One Multicall3 per slice; the cursor is kept in the same table under a
+// reserved row so it survives deploys and picks up where it left off.
+const WARM_SLICE = 400, WARM_CURSOR = -1, SUPPLY_ALL = 5555;   // the collection is fixed at 5555
+export async function warmActivation(env, { slice = WARM_SLICE } = {}) {
+  const d = db(env);
+  let from = 1;
+  try { const r = await d.prepare("SELECT active FROM mh_foundry_activated WHERE token_id = ?").bind(WARM_CURSOR).first(); if (r) from = Math.max(1, Number(r.active) || 1); } catch { /* table may predate this */ }
+  const ids = [];
+  for (let i = 0; i < slice && from + i <= SUPPLY_ALL; i++) ids.push(from + i);
+  if (!ids.length) { from = 1; return { warmed: 0, next: 1, wrapped: true }; }
+  let active;
+  try { active = await activatedMany(env, ids); } catch (e) { return { warmed: 0, next: from, error: String(e && e.message || e) }; }
+  const now = Math.floor(Date.now() / 1000);
+  const stmts = ids.map((id) => d.prepare("INSERT INTO mh_foundry_activated (token_id, active, checked_at) VALUES (?, ?, ?) ON CONFLICT(token_id) DO UPDATE SET active = excluded.active, checked_at = excluded.checked_at").bind(id, active.has(id) ? 1 : 0, now));
+  const next = from + ids.length > SUPPLY_ALL ? 1 : from + ids.length;
+  stmts.push(d.prepare("INSERT INTO mh_foundry_activated (token_id, active, checked_at) VALUES (?, ?, ?) ON CONFLICT(token_id) DO UPDATE SET active = excluded.active, checked_at = excluded.checked_at").bind(WARM_CURSOR, next, now));
+  await d.batch(stmts);
+  return { warmed: ids.length, from, next, activated: [...active].length };
 }
 
 export async function readStates(env, ids) {
