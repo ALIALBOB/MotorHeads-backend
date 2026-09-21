@@ -561,8 +561,12 @@ export async function foundryEconomyRoute(request, env, match) {
     if (action === "catalogue" && new URL(request.url).searchParams.get("all") === "1" && (await optionalFoundryAdmin(request, env)))
     { const sold = new Map(); try { for (const r of ((await db(env).prepare("SELECT item_key, COUNT(*) AS n FROM mh_foundry_owned GROUP BY item_key").all()).results || [])) sold.set(String(r.item_key), Number(r.n)); } catch (e) { if (!noTable(e)) throw e; }
       return customizationJson({ ok: true, currency: "ETH", bonusCap: ITEM_BONUS_CAP, items: (await readCatalogue(env, { all: true })).map((c) => ({ ...c, sold: sold.get(c.key) || 0 })) }, { request, env, methods: "GET,OPTIONS" }); }
+    // Every part, each carrying its `active` flag — NOT only the active ones. A part that is retired, or
+    // was never put on sale at all (a commission), still has to be nameable and wearable by whoever owns
+    // it; the shop decides what to SELL from the flag. Returning only active rows meant a granted
+    // one-of-a-kind was invisible to the Bench and could never be put on.
     if (action === "catalogue") return customizationJson({ ok: true, currency: "ETH", treasury: TREASURY_WALLET, bonusCap: ITEM_BONUS_CAP,
-      crateId: FOUNDRY_CRATE_ID, items: (await readCatalogue(env)).map((c) => ({ key: c.key, name: c.name, priceWei: c.priceWei, bonus: c.bonus, partId: c.partId, kind: c.kind })) }, { request, env, cors: "public", cacheControl: "public, max-age=60" });
+      crateId: FOUNDRY_CRATE_ID, items: (await readCatalogue(env, { all: true })).map((c) => ({ key: c.key, name: c.name, priceWei: c.priceWei, bonus: c.bonus, partId: c.partId, kind: c.kind, active: c.active })) }, { request, env, cors: "public", cacheControl: "public, max-age=60" });
     return customizationJson({ ok: true, ...(await readState(env, tokenIdOf(match[3]))) }, { request, env, cors: "public", cacheControl: "public, max-age=20" });
   }
   if (request.method !== "POST") throw new ApiError(405, "METHOD_NOT_ALLOWED", "Use POST.");
