@@ -51,6 +51,13 @@ export function validateItems(raw, allowed = ITEM_KEYS) {
     for (const k of ["dx", "dy", "dz"]) { const v = num(it[k], -3, 3, 0); if (v) o[k] = +v.toFixed(3); }
     for (const k of ["rx", "ry", "rz"]) { const v = num(it[k], -Math.PI, Math.PI, 0); if (v) o[k] = +v.toFixed(3); }
     const s = num(it.s, 0.15, 3, null); if (s !== null) o.s = +s.toFixed(3);
+    // COLOUR: an index into the site's basic-colour table, never a hex. The server validates the range and
+    // nothing else, so the palette can be retuned in the art without a backend deploy.
+    if (it.tint !== undefined && it.tint !== null && it.tint !== "") {
+      const t = Math.trunc(Number(it.tint));
+      if (!Number.isFinite(t) || t < 0 || t > 31) throw new ApiError(400, "ITEM_INVALID", "Bad item colour.");
+      if (t > 0) o.tint = t;      // 0 = the part's own colours, which is the default and is never stored
+    }
     const lift = num(it.lift, -2, 2, 0); if (lift) o.lift = +lift.toFixed(3);
     // FREE placement (dragged onto the robot in the Bench): the surface point relative to the head centre, in head
     // widths, and the surface normal the item stands on
