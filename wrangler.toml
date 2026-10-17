@@ -15,6 +15,9 @@ ROBINHOOD_RPC = "https://rpc.mainnet.chain.robinhood.com"
 # Opt-in equip is LIVE: the animation shows only what a holder has equipped on MotorHeadsEquip (0 = none).
 # Grandfathered tokens (#1/#20/#124) were seeded on-chain first. Set to "false" + redeploy to instantly revert to first-owned.
 EQUIP_READS = "true"
+# CLASSIC_ART_ONLY (founder 2026-10-17): back to the 2D art "as it was at the first" — chain-state never reports a crate
+# effect or background, so no 2D view shows a customisation. The pinned 2D animation never read them anyway.
+CLASSIC_ART_ONLY = "true"
 FOUNDRY_OWNERSHIP = "eth"   # ONLY the real Ethereum collection authorises an edit; the default "both" let a REHEARSAL-collection token edit a live NFT
 FOUNDRY_REQUIRE_ACTIVATION = "true"   # parts and custom builds only go on an ACTIVATED robot (founder 2026-09-19); buying one already required it
 FOUNDRY_SITE_FEE_USD = "1"   # the site fee in USD, charged in ETH on every paid or saved action (src/foundry/economy.js siteFee); "0" = off

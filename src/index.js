@@ -132,10 +132,16 @@ async function route(request, env, ctx = {}) {
     const cached = await cache.match(cacheKey);
     if (cached) return cached;
 
-    const grab = (base) => fetch(base + "/ipfs/" + rest + url.search, {
+    // CACHE ONLY SUCCESS. `cacheTtl` + `cacheEverything` cached EVERY status for a year - a gateway's one bad moment (an
+    // ipfs.io 429, a Filebase 5xx) was stored and replayed instantly forever, and the Archive reactor's 333 screens showed
+    // "Bad gateway" while Filebase itself was serving the file fine (founder, 2026-10-02). `cacheTtlByStatus` keeps 2xx for a
+    // year and never stores an error. `mhv=2` re-keys the upstream request so the errors poisoned under the old key are not
+    // replayed; gateways ignore unknown query parameters and the content behind a CID cannot change.
+    const sep = url.search ? "&" : "?";
+    const grab = (base) => fetch(base + "/ipfs/" + rest + url.search + sep + "mhv=2", {
       headers: { Accept: "*/*" },
       signal: AbortSignal.timeout(12000),
-      cf: { cacheTtl: 31536000, cacheEverything: true }
+      cf: { cacheEverything: true, cacheTtlByStatus: { "200-299": 31536000, "300-599": 0 } }
     }).then((r) => (r.ok ? r : Promise.reject(new Error("gateway " + r.status))));
 
     let upstream;
@@ -143,7 +149,8 @@ async function route(request, env, ctx = {}) {
       // Promise.any → whichever independent gateway answers first (both proven to serve real content server-side).
       upstream = await Promise.any([
         grab("https://ipfs.filebase.io"),
-        grab("https://ipfs.io")
+        grab("https://ipfs.io"),
+        grab("https://dweb.link")        // a third, independent gateway: ipfs.io rate-limits (429) at busy times
       ]);
     } catch {
       return new Response("ipfs upstream unavailable", { status: 502, headers: { "access-control-allow-origin": "*" } });
@@ -367,8 +374,14 @@ async function handleTokenChainState(request, env, rawTokenId) {
   }
 
   const chainState = await readTokenChainState(env, tokenId);
-  chainState.effect = await readTokenEffect(env, tokenId); // applied whole-machine effect (null if none) — drives the live animation FX
-  chainState.background = await readTokenBackground(env, tokenId); // applied animated background (null if none) — drives the anim's behind layer
+  // CLASSIC_ART_ONLY (founder, 2026-10-17: "just the art as it was at the first — no customise, no save on chain,
+  // nothing"): the pinned 2D animation draws its fixed base layout and asks only this route for live data. Effects and
+  // backgrounds are crate wins a holder equipped later, so with the switch on they are always null — the value the
+  // animation already treats as "no effect", byte-identical to the launch art. The chain history (age, sales, blocks)
+  // stays: that is what the original living-machine animation was built on.
+  const classic = String(env.CLASSIC_ART_ONLY || "").toLowerCase() === "true";
+  chainState.effect = classic ? null : await readTokenEffect(env, tokenId); // applied whole-machine effect (null if none) — drives the live animation FX
+  chainState.background = classic ? null : await readTokenBackground(env, tokenId); // applied animated background (null if none) — drives the anim's behind layer
   return json({ ok: true, chainState }, {}, env);
 }
 
